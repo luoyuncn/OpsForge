@@ -16,6 +16,7 @@ Implemented plans:
 - Plan 2: `docs/superpowers/plans/2026-06-23-opsforge-plan-2-deterministic-pipeline.md`
 - Plan 3: `docs/superpowers/plans/2026-06-23-opsforge-plan-3-audit-persistence.md`
 - Plan 4: `docs/superpowers/plans/2026-06-23-opsforge-plan-4-planner-provider-scaffold.md`
+- Plan 5: `docs/superpowers/plans/2026-06-23-opsforge-plan-5-json-schema-plan-output.md`
 
 ## Delivered In Plan 1
 
@@ -87,18 +88,30 @@ Implemented plans:
   - `opsforge plan "<NL>" --json` emits schema-valid Plan JSON.
   - Plan generation is non-mutating and does not call host executors.
 
+## Delivered In Plan 5
+
+- `@opsforge/dsl`
+  - `createPlanJsonSchema()` exports JSON Schema from the zod Plan schema.
+  - `planJsonSchema` provides a runtime singleton for provider/tooling consumers.
+  - `schemas/plan.schema.json` is checked in and verified against the runtime export.
+
+- `@opsforge/cli`
+  - `opsforge plan "<NL>" --out <file>` writes schema-valid Plan JSON to disk.
+  - Saved plan files can be consumed by `opsforge apply <file> --dry-run`.
+  - Plan file writing remains non-mutating with respect to host operations.
+
 ## Design Alignment Check
 
 | Spec Area | Status | Evidence | Notes |
 |---|---:|---|---|
-| §3 DSL | Partial | `packages/dsl` | Core schema exists; JSON Schema export is still missing. |
+| §3 DSL | Partial | `packages/dsl`, `schemas/plan.schema.json` | Core schema and Plan JSON Schema export exist. Job/approval/inventory/audit schema artifacts remain. |
 | §4 Core pipeline | Partial | `packages/core/src/execute.ts` | Deterministic spine exists; rollback orchestration is not implemented yet. |
 | §4.1 Executor abstraction | Partial | `packages/executor-base` | Interfaces and injectable runner exist. Real host detection is still shallow. |
 | §4.2 Linux executor | Partial | `packages/executor-linux` | Compile layer exists for apt/dnf/yum and systemd. Real safe file writing needs a later pass. |
 | §4.3 Windows executor | Partial | `packages/executor-windows` | Compile layer exists for winget/choco and services. UAC/admin detection remains open. |
 | §5 Policy and guard | Partial | `packages/policy` | Deterministic classifier/gate/guards exist. More rules and config knobs are needed. |
 | §6 Planner/provider layer | Partial | `packages/planner` | Provider boundary, DSL validation, and mock provider exist. Real OpenAI/Anthropic/Google/Pi adapters, JSON retry, and Pi sessions remain. |
-| §7.2 CLI mode | Partial | `apps/cli/src/commands` | `doctor`, `plan`, `apply`, and `audit ls/show` exist. `run/verify/rollback/config` remain. |
+| §7.2 CLI mode | Partial | `apps/cli/src/commands` | `doctor`, `plan`, `plan --out`, `apply`, and `audit ls/show` exist. `run/verify/rollback/config` remain. |
 | §8 Audit | Partial | `packages/audit` | SQLite event store and stdout/stderr artifacts exist. Rich reports, retention/export, rollback audit views, and TUI timeline consumption remain. |
 | §11 Tests | Partial | package tests | Unit tests cover deterministic components and do not mutate the host. |
 
@@ -112,15 +125,16 @@ Implemented plans:
 - Audit retention/export and richer report generation are not implemented.
 - TUI timeline consumption of audit history is not implemented.
 - Provider configuration commands, real provider adapters, and model capability checks are not implemented.
-- JSON Schema export from DSL is not implemented.
+- Only the Plan JSON Schema artifact is exported; job, approval, inventory, and audit schema artifacts remain.
+- Generated plans are persisted as files, not yet in a first-class plan registry.
 - Real elevated privilege detection and safe elevation flows are incomplete.
 - Skill templates such as install-nginx/install-docker/install-nodejs are not implemented.
 
 ## Next Plan Recommendation
 
-Plan 5 should focus on either:
+Plan 6 should focus on either:
 
 1. provider configuration commands and a real OpenAI-compatible planner adapter with mocked HTTP tests, or
-2. DSL JSON Schema export plus plan file writing/persistence so generated plans can be saved and applied directly.
+2. CLI `run "<NL>"` as a composed `plan -> gate -> apply` flow using the existing mock planner and dry-run-safe execution path.
 
-The safer next slice is DSL JSON Schema export plus plan file writing because it strengthens the planning artifact boundary before real LLM calls are introduced.
+The safer next slice is CLI `run "<NL>" --dry-run` because it connects existing planner and executor pieces without introducing live LLM credentials yet.
