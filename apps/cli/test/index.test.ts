@@ -268,6 +268,7 @@ describe("main TUI entry", () => {
       buildDoctorReport: async () => ({
         facts: linuxFacts,
         provider: "mock",
+        providerModel: "gpt-test",
         providerCapabilities: ["none"],
         riskMax: "L3",
         allowShell: false,
@@ -275,11 +276,13 @@ describe("main TUI entry", () => {
       }),
       runTui: (_status, options) => {
         calls.push(options?.onAction);
+        calls.push(_status.model);
       },
       createActionHandler: async () => async () => [],
       write: () => {},
     });
 
     expect(calls[0]).toEqual(expect.any(Function));
+    expect(calls[1]).toBe("gpt-test");
   });
 });

@@ -711,6 +711,7 @@ describe("reduceTuiKeyInput", () => {
 
     expect(state.input.lastSubmitted).toBe("in");
     expect(state.status.lastSubmittedPrompt).toBe("in");
+    expect(state.status.thinkingText).toBe("Planning with the configured provider...");
     expect(result.action).toEqual({ type: "submit.prompt", prompt: "in" });
   });
 

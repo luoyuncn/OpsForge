@@ -22,6 +22,7 @@ export interface DoctorDeps {
 export interface DoctorReport {
   facts: HostFacts;
   provider: string;
+  providerModel?: string;
   providerCapabilities: string[];
   riskMax: string;
   allowShell: boolean;
@@ -60,6 +61,7 @@ const reportFromFacts = (deps: DoctorDeps, facts: HostFacts): DoctorReport => {
   return {
     facts,
     provider,
+    providerModel: p?.model,
     providerCapabilities: describeProviderCapabilities(p),
     riskMax: config.riskMax,
     allowShell: config.allowShell,

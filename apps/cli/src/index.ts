@@ -112,6 +112,7 @@ export const main = async (argv = process.argv, deps: MainDeps = {}): Promise<vo
     const status = createTuiStatus({
       facts: report.facts,
       provider: report.provider,
+      model: report.providerModel,
       sessionLabel: "local",
       auditLabel: "default",
     });

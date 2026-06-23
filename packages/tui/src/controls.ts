@@ -91,6 +91,28 @@ const slashCommandAction = (state: TuiState, prompt: string): TuiUserAction | un
   return { type: "audit.run.open", runId: selector };
 };
 
+const actionFeedbackText = (action: TuiUserAction): string => {
+  switch (action.type) {
+    case "submit.prompt":
+      return "Planning with the configured provider...";
+    case "approval.approve":
+      return "Approval recorded; continuing guarded execution...";
+    case "approval.deny":
+      return "Approval denied.";
+    case "rollback.run":
+      return `Running rollback for ${action.runId}...`;
+    case "rollback.skip":
+      return `Rollback skipped for ${action.runId}.`;
+    case "audit.history.load":
+      return "Loading audit history...";
+    case "audit.run.open":
+      return `Opening audit run ${action.runId}...`;
+  }
+};
+
+const withActionFeedback = (state: TuiState, action: TuiUserAction): TuiState =>
+  reduceTuiEvent(state, { type: "thinking.delta", text: actionFeedbackText(action) });
+
 export const reduceTuiKeyInput = (
   state: TuiState,
   input: string,
@@ -110,8 +132,9 @@ export const reduceTuiKeyInput = (
     if (!prompt) return { state };
     const next = reduceTuiEvent(state, { type: "input.submitted" });
     const action = slashCommandAction(state, prompt);
-    if (action) return { state: next, action };
-    return { state: next, action: { type: "submit.prompt", prompt } };
+    if (action) return { state: withActionFeedback(next, action), action };
+    const submitAction: TuiUserAction = { type: "submit.prompt", prompt };
+    return { state: withActionFeedback(next, submitAction), action: submitAction };
   }
 
   return { state: appendInput(state, input) };
