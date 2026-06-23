@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
+import type { ExecutePlanResult } from "@opsforge/core";
 import type { Plan } from "@opsforge/dsl";
 import type { HostFacts } from "@opsforge/executor-base";
 import {
+  createExecutionTimeline,
   createTuiPlanCard,
   createTuiStatus,
+  formatExecutionTimelineSnapshot,
   formatPlanCardSnapshot,
   formatTuiSnapshot,
 } from "../src/index";
@@ -45,6 +48,53 @@ const nginxPlan: Plan = {
   risk: "L1",
   explanation: ["Install nginx from the system package manager."],
   createdAt: "2026-06-23T00:00:00.000Z",
+};
+
+const nginxExecutionResult: ExecutePlanResult = {
+  runId: "run_plan_nginx",
+  risk: "L1",
+  gate: {
+    allowed: true,
+    reason: "risk gate passed",
+  },
+  commands: [
+    {
+      shell: "bash",
+      argv: ["apt-get", "install", "-y", "nginx"],
+      needsElevation: true,
+      describe: "Install package nginx with apt",
+    },
+  ],
+  stepResults: [
+    {
+      step: { type: "package-install", name: "nginx" },
+      command: {
+        shell: "bash",
+        argv: ["apt-get", "install", "-y", "nginx"],
+        needsElevation: true,
+        describe: "Install package nginx with apt",
+      },
+      stdout: "installed nginx",
+      stderr: "",
+      exitCode: 0,
+      startedAt: "2026-06-23T00:00:00.000Z",
+      endedAt: "2026-06-23T00:00:01.250Z",
+      truncated: false,
+    },
+  ],
+  verificationResults: [
+    {
+      verification: { type: "service-status", name: "nginx", expect: "active" },
+      ok: true,
+      message: "service nginx status active",
+    },
+  ],
+  rollback: {
+    autoExecuted: false,
+    available: false,
+    reason: "rollback not needed",
+  },
+  auditEvents: [],
 };
 
 describe("createTuiStatus", () => {
@@ -99,6 +149,20 @@ describe("formatTuiSnapshot", () => {
     expect(snapshot).toContain("Risk: L1");
     expect(snapshot).toContain("apt-get install -y nginx");
   });
+
+  it("renders an attached execution timeline inside the TUI snapshot", () => {
+    const snapshot = formatTuiSnapshot(createTuiStatus({
+      facts: linuxFacts,
+      provider: "mock",
+      plan: nginxPlan,
+      execution: nginxExecutionResult,
+    }));
+
+    expect(snapshot).toContain("Run: run_plan_nginx");
+    expect(snapshot).toContain("Exit: 0");
+    expect(snapshot).toContain("Verification: pass");
+    expect(snapshot).toContain("rollback not needed");
+  });
 });
 
 describe("createTuiPlanCard", () => {
@@ -128,5 +192,32 @@ describe("formatPlanCardSnapshot", () => {
     expect(snapshot).toContain("service-status nginx active");
     expect(snapshot).toContain("Rollback:");
     expect(snapshot).toContain("systemctl stop nginx");
+  });
+});
+
+describe("createExecutionTimeline", () => {
+  it("builds a deterministic execution timeline from a core execution result", () => {
+    const timeline = createExecutionTimeline(nginxExecutionResult);
+
+    expect(timeline.runId).toBe("run_plan_nginx");
+    expect(timeline.steps[0]?.command).toBe("apt-get install -y nginx");
+    expect(timeline.steps[0]?.stdout).toBe("installed nginx");
+    expect(timeline.steps[0]?.exitCode).toBe(0);
+    expect(timeline.verifications[0]?.status).toBe("pass");
+    expect(timeline.rollback.reason).toBe("rollback not needed");
+  });
+});
+
+describe("formatExecutionTimelineSnapshot", () => {
+  it("renders step output, verification status, and rollback outcome", () => {
+    const snapshot = formatExecutionTimelineSnapshot(createExecutionTimeline(nginxExecutionResult));
+
+    expect(snapshot).toContain("Run: run_plan_nginx");
+    expect(snapshot).toContain("apt-get install -y nginx");
+    expect(snapshot).toContain("stdout: installed nginx");
+    expect(snapshot).toContain("Exit: 0");
+    expect(snapshot).toContain("Verification: pass");
+    expect(snapshot).toContain("service nginx status active");
+    expect(snapshot).toContain("Rollback: rollback not needed");
   });
 });

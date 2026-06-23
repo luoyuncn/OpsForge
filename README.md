@@ -20,6 +20,7 @@ OpsForge is now being built plan-by-plan on `main`.
 - Plan 13 host facts and doctor: `docs/superpowers/plans/2026-06-23-opsforge-plan-13-host-facts-doctor.md`
 - Plan 14 TUI foundation: `docs/superpowers/plans/2026-06-23-opsforge-plan-14-tui-foundation.md`
 - Plan 15 TUI plan card: `docs/superpowers/plans/2026-06-23-opsforge-plan-15-tui-plan-card.md`
+- Plan 16 TUI execution timeline: `docs/superpowers/plans/2026-06-23-opsforge-plan-16-tui-execution-timeline.md`
 - Current implementation status and design alignment: `docs/implementation-status.md`
 - Checked-in Plan schema artifact: `schemas/plan.schema.json`
 

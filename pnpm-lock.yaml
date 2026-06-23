@@ -280,6 +280,9 @@ importers:
 
   packages/tui:
     dependencies:
+      '@opsforge/core':
+        specifier: workspace:*
+        version: link:../core
       '@opsforge/dsl':
         specifier: workspace:*
         version: link:../dsl

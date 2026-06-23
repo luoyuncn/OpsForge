@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Text, render } from "ink";
+import type { ExecutePlanResult } from "@opsforge/core";
 import type { Plan } from "@opsforge/dsl";
 import type { HostFacts } from "@opsforge/executor-base";
 import {
@@ -7,6 +8,11 @@ import {
   formatPlanCardSnapshot,
   type TuiPlanCard,
 } from "./plan-card";
+import {
+  createExecutionTimeline,
+  formatExecutionTimelineSnapshot,
+  type TuiExecutionTimeline,
+} from "./timeline";
 
 export {
   createTuiPlanCard,
@@ -15,6 +21,14 @@ export {
   type TuiPlanCard,
   type TuiPlanStepPreview,
 } from "./plan-card";
+export {
+  createExecutionTimeline,
+  formatExecutionTimelineSnapshot,
+  type TuiExecutionTimeline,
+  type TuiTimelineRollback,
+  type TuiTimelineStep,
+  type TuiTimelineVerification,
+} from "./timeline";
 
 export interface TuiStatus {
   facts: HostFacts;
@@ -23,6 +37,7 @@ export interface TuiStatus {
   sessionLabel: string;
   auditLabel: string;
   planCard?: TuiPlanCard;
+  timeline?: TuiExecutionTimeline;
 }
 
 export interface TuiLaunchOptions {
@@ -32,6 +47,7 @@ export interface TuiLaunchOptions {
   sessionLabel?: string;
   auditLabel?: string;
   plan?: Plan;
+  execution?: ExecutePlanResult;
 }
 
 export const createTuiStatus = (options: TuiLaunchOptions): TuiStatus => ({
@@ -41,6 +57,7 @@ export const createTuiStatus = (options: TuiLaunchOptions): TuiStatus => ({
   sessionLabel: options.sessionLabel ?? "local",
   auditLabel: options.auditLabel ?? "default",
   planCard: options.plan ? createTuiPlanCard(options.plan, options.facts) : undefined,
+  timeline: options.execution ? createExecutionTimeline(options.execution) : undefined,
 });
 
 const formatDistro = (facts: HostFacts): string => {
@@ -63,8 +80,9 @@ export const formatTuiSnapshot = (status: TuiStatus): string => [
   `Session: ${status.sessionLabel}`,
   `Audit: ${status.auditLabel}`,
   status.planCard ? formatPlanCardSnapshot(status.planCard) : "Timeline: waiting for a task",
+  status.timeline ? formatExecutionTimelineSnapshot(status.timeline) : undefined,
   "Ask Forge >",
-].join("\n");
+].filter((line): line is string => Boolean(line)).join("\n");
 
 export interface TuiAppProps {
   status: TuiStatus;
@@ -91,6 +109,7 @@ export const TuiApp = ({ status }: TuiAppProps): React.ReactElement => (
           <Text color="gray">Plan card, execution timeline, approvals, and rollback prompts land in the next TUI plans.</Text>
         </>
       )}
+      {status.timeline ? <ExecutionTimelineView timeline={status.timeline} /> : null}
     </Box>
     <Box marginTop={1}>
       <Text color="green">Ask Forge &gt; </Text>
@@ -141,6 +160,45 @@ const PlanCardView = ({ card }: PlanCardViewProps): React.ReactElement => (
       {(card.explanation.length ? card.explanation : ["none"]).map((line) => (
         <Text key={line}>- {line}</Text>
       ))}
+    </Box>
+  </Box>
+);
+
+interface ExecutionTimelineViewProps {
+  timeline: TuiExecutionTimeline;
+}
+
+const ExecutionTimelineView = ({ timeline }: ExecutionTimelineViewProps): React.ReactElement => (
+  <Box marginTop={1} flexDirection="column">
+    <Text bold>Run: {timeline.runId}</Text>
+    <Text>Gate: {timeline.gateReason}</Text>
+    <Box marginTop={1} flexDirection="column">
+      <Text color="cyan">Execution</Text>
+      {timeline.steps.map((step) => (
+        <Box key={`${step.label}-${step.command}`} flexDirection="column">
+          <Text>{step.label}</Text>
+          <Text>command: {step.command}</Text>
+          <Text>stdout: {step.stdout}</Text>
+          <Text>stderr: {step.stderr}</Text>
+          <Text>Exit: {step.exitCode}</Text>
+          <Text>Duration: {step.durationMs}ms{step.truncated ? " truncated" : ""}</Text>
+        </Box>
+      ))}
+      {timeline.steps.length === 0 ? <Text>- none</Text> : null}
+    </Box>
+    <Box marginTop={1} flexDirection="column">
+      <Text color="cyan">Verifications</Text>
+      {timeline.verifications.map((verification) => (
+        <Text key={`${verification.label}-${verification.message}`}>
+          Verification: {verification.status} {verification.label} - {verification.message}
+        </Text>
+      ))}
+      {timeline.verifications.length === 0 ? <Text>- none</Text> : null}
+    </Box>
+    <Box marginTop={1} flexDirection="column">
+      <Text color="cyan">Rollback</Text>
+      <Text>{timeline.rollback.reason}</Text>
+      {timeline.rollback.suggestedCommand ? <Text>{timeline.rollback.suggestedCommand}</Text> : null}
     </Box>
   </Box>
 );
