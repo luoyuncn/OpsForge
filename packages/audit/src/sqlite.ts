@@ -174,6 +174,7 @@ export const createSqliteAuditStore = (options: CreateSqliteAuditStoreOptions): 
   );
 
   let closed = false;
+  const recorded: AuditEvent[] = [];
 
   const assertOpen = () => {
     if (closed) throw new Error("Audit store is closed");
@@ -186,6 +187,7 @@ export const createSqliteAuditStore = (options: CreateSqliteAuditStoreOptions): 
       const runId = eventRunId(event);
 
       insertEvent.run(runId ?? null, planId ?? null, event.type, event.at, JSON.stringify(event.payload));
+      recorded.push(event);
 
       if (event.type === "plan.created") {
         insertPlan.run(event.payload.planId, event.payload.intent, event.payload.risk, event.at);
@@ -215,11 +217,7 @@ export const createSqliteAuditStore = (options: CreateSqliteAuditStoreOptions): 
     },
     events: () => {
       assertOpen();
-      return (db.prepare("SELECT type, at, payload_json FROM audit_events ORDER BY id").all() as unknown as EventRow[]).map((row) => ({
-        type: row.type,
-        at: row.at,
-        payload: JSON.parse(row.payload_json),
-      })) as AuditEvent[];
+      return recorded.slice();
     },
     listRuns: () => {
       assertOpen();

@@ -122,6 +122,25 @@ describe("createSqliteAuditStore", () => {
     store.close();
   });
 
+  it("returns only events recorded by the current store instance", () => {
+    const dbPath = join(dir, "opsforge.db");
+    const artifactsDir = join(dir, "artifacts");
+    const firstStore = createSqliteAuditStore({ dbPath, artifactsDir });
+    firstStore.record({ type: "plan.created", at: "2026-06-23T00:00:00Z", payload: { planId: "p1", intent: "install", risk: "L1" } });
+    firstStore.record({ type: "job.dispatched", at: "2026-06-23T00:00:01Z", payload: { runId: "r1", planId: "p1" } });
+    firstStore.close();
+
+    const secondStore = createSqliteAuditStore({ dbPath, artifactsDir });
+    secondStore.record({ type: "plan.created", at: "2026-06-23T00:01:00Z", payload: { planId: "p2", intent: "install", risk: "L1" } });
+
+    expect(secondStore.events()).toEqual([
+      { type: "plan.created", at: "2026-06-23T00:01:00Z", payload: { planId: "p2", intent: "install", risk: "L1" } },
+    ]);
+    expect(secondStore.listRuns().map((run) => run.runId)).toEqual(["r1"]);
+
+    secondStore.close();
+  });
+
   it("writes stdout and stderr artifacts for step results", async () => {
     const store = createSqliteAuditStore({ dbPath: join(dir, "opsforge.db"), artifactsDir: join(dir, "artifacts") });
     store.recordStepArtifacts("r1", 0, "hello", "warn");
