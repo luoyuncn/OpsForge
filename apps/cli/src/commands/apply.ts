@@ -9,7 +9,8 @@ import { parsePlan, type Plan, type RiskLevel } from "@opsforge/dsl";
 import type { CommandRunner, HostFacts, RawCommandResult } from "@opsforge/executor-base";
 import { createLinuxExecutor } from "@opsforge/executor-linux";
 import { createWindowsExecutor } from "@opsforge/executor-windows";
-import { detectOs, detectPackageManagers, type DetectedOs, type WhichRunner } from "../detect";
+import { detectOs, detectPackageManagers, type WhichRunner } from "../detect";
+import { detectLocalHostFacts } from "../host-facts";
 import { systemWhich } from "../which";
 
 const execFileAsync = promisify(execFile);
@@ -25,6 +26,9 @@ export interface ApplyOptions {
 
 export interface ExecutePlanDeps {
   platform?: NodeJS.Platform;
+  arch?: string;
+  getUid?: () => number;
+  linuxRelease?: string | null;
   facts?: HostFacts;
   which?: WhichRunner;
   runner?: CommandRunner;
@@ -165,20 +169,23 @@ export const createDefaultVerifyDeps = (
   };
 };
 
-const factsFromHost = (os: DetectedOs, which: WhichRunner): HostFacts => {
-  if (os !== "linux" && os !== "windows") {
-    throw new Error(`Unsupported OS for apply: ${os}`);
-  }
-  return {
-    osFamily: os,
-    arch: process.arch,
-    isElevated: false,
-    packageManagers: detectPackageManagers(os, which),
-  };
-};
-
 const executorForFacts = (facts: HostFacts) =>
   facts.osFamily === "windows" ? createWindowsExecutor() : createLinuxExecutor();
+
+const platformForOs = (os: Plan["osFamily"] | undefined, fallback: NodeJS.Platform): NodeJS.Platform => {
+  if (os === "linux") return "linux";
+  if (os === "windows") return "win32";
+  return fallback;
+};
+
+const detectFactsForPlan = (plan: Plan, deps: ExecutePlanDeps): HostFacts =>
+  detectLocalHostFacts({
+    platform: platformForOs(plan.osFamily, deps.platform ?? process.platform),
+    arch: deps.arch,
+    which: deps.which ?? systemWhich,
+    getUid: deps.getUid ?? process.getuid?.bind(process),
+    linuxRelease: deps.linuxRelease,
+  });
 
 const recordArtifacts = (audit: AuditStore, runId: string, stepResults: ExecutePlanResult["stepResults"]): void => {
   for (const [index, stepResult] of stepResults.entries()) {
@@ -191,8 +198,7 @@ export const executeParsedPlan = async (
   options: ApplyOptions,
   deps: ExecutePlanDeps = {},
 ): Promise<ApplyResult> => {
-  const hostOs = detectOs(deps.platform ?? process.platform);
-  const facts = deps.facts ?? factsFromHost(plan.osFamily ?? hostOs, deps.which ?? systemWhich);
+  const facts = deps.facts ?? detectFactsForPlan(plan, deps);
   const createdAuditStore = deps.auditStore === undefined;
   const audit = deps.auditStore ?? createSqliteAuditStore(resolveOpsForgePaths(deps.config ?? loadConfig()));
 
@@ -207,7 +213,10 @@ export const executeParsedPlan = async (
       riskMax: options.riskMax,
       allowShell: options.allowShell,
       runner: deps.runner ?? defaultRunner,
-      verifyDeps: deps.verifyDeps ?? createDefaultVerifyDeps(),
+      verifyDeps: deps.verifyDeps ?? createDefaultVerifyDeps({
+        platform: platformForOs(facts.osFamily, deps.platform ?? process.platform),
+        packageManagers: facts.packageManagers,
+      }),
       autoRollback: options.autoRollback ?? false,
     });
 
@@ -226,8 +235,7 @@ export const executeRollbackPlan = async (
   options: ApplyOptions,
   deps: ExecutePlanDeps = {},
 ): Promise<ApplyResult> => {
-  const hostOs = detectOs(deps.platform ?? process.platform);
-  const facts = deps.facts ?? factsFromHost(plan.osFamily ?? hostOs, deps.which ?? systemWhich);
+  const facts = deps.facts ?? detectFactsForPlan(plan, deps);
   const createdAuditStore = deps.auditStore === undefined;
   const audit = deps.auditStore ?? createSqliteAuditStore(resolveOpsForgePaths(deps.config ?? loadConfig()));
 

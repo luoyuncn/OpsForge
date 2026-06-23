@@ -109,6 +109,23 @@ describe("buildApplyCommand", () => {
       { runId: result.runId, stepIndex: 0, stdout: "installed", stderr: "note" },
     ]);
   });
+
+  it("uses detected host facts when explicit facts are not supplied", async () => {
+    const apply = buildApplyCommand({
+      readFile: async () => JSON.stringify(installPlan),
+      platform: "linux",
+      arch: "x64",
+      getUid: () => 0,
+      linuxRelease: "ID=fedora\nVERSION_ID=40\n",
+      which: (cmd) => cmd === "dnf",
+      auditStore: createFakeAuditStore(),
+      runner: async () => ({ stdout: "", stderr: "", exitCode: 0 }),
+    });
+
+    const result = await apply("plan.json", { dryRun: true, yes: false, json: false, riskMax: "L3", allowShell: false });
+
+    expect(result.commands[0].argv).toEqual(["dnf", "-y", "install", "nginx"]);
+  });
 });
 
 describe("createDefaultVerifyDeps", () => {

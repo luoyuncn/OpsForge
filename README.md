@@ -17,6 +17,7 @@ OpsForge is now being built plan-by-plan on `main`.
 - Plan 10 auto rollback trigger: `docs/superpowers/plans/2026-06-23-opsforge-plan-10-auto-rollback.md`
 - Plan 11 verifier coverage: `docs/superpowers/plans/2026-06-23-opsforge-plan-11-verifier-coverage.md`
 - Plan 12 default verifier probes: `docs/superpowers/plans/2026-06-23-opsforge-plan-12-default-verifier-probes.md`
+- Plan 13 host facts and doctor: `docs/superpowers/plans/2026-06-23-opsforge-plan-13-host-facts-doctor.md`
 - Current implementation status and design alignment: `docs/implementation-status.md`
 - Checked-in Plan schema artifact: `schemas/plan.schema.json`
 

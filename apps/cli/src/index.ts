@@ -4,7 +4,7 @@ import { defaultConfigPath } from "@opsforge/config";
 import { buildAuditCommand } from "./commands/audit";
 import { buildApplyCommand, formatApplyResult, parseRiskMax } from "./commands/apply";
 import { buildConfigCommand } from "./commands/config";
-import { buildDoctorReport, formatDoctorReport } from "./commands/doctor";
+import { buildDoctorReportAsync, formatDoctorReport } from "./commands/doctor";
 import { buildPlanCommand } from "./commands/plan";
 import { buildRollbackCommand } from "./commands/rollback";
 import { buildRunCommand } from "./commands/run";
@@ -27,8 +27,8 @@ program.name("opsforge").description("OpsForge — 本机优先的安全运维 A
 program
   .command("doctor")
   .description("自检：OS、包管理器、provider 配置")
-  .action(() => {
-    const report = buildDoctorReport({
+  .action(async () => {
+    const report = await buildDoctorReportAsync({
       platform: process.platform,
       which: systemWhich,
       env: process.env,

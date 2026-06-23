@@ -24,6 +24,7 @@ Implemented plans:
 - Plan 10: `docs/superpowers/plans/2026-06-23-opsforge-plan-10-auto-rollback.md`
 - Plan 11: `docs/superpowers/plans/2026-06-23-opsforge-plan-11-verifier-coverage.md`
 - Plan 12: `docs/superpowers/plans/2026-06-23-opsforge-plan-12-default-verifier-probes.md`
+- Plan 13: `docs/superpowers/plans/2026-06-23-opsforge-plan-13-host-facts-doctor.md`
 
 ## Delivered In Plan 1
 
@@ -189,24 +190,34 @@ Implemented plans:
   - Port checks use a short local TCP connection to `127.0.0.1`.
   - Tests cover Linux command generation, Windows command generation, and open/closed local TCP port behavior without mutating the host.
 
+## Delivered In Plan 13
+
+- `@opsforge/cli`
+  - Added centralized local HostFacts detection in `apps/cli/src/host-facts.ts`.
+  - HostFacts now detect OS family, architecture, package managers, Linux distro/version from os-release content, Linux root elevation via `process.getuid()`, and Windows admin elevation through read-only `net session`.
+  - `apply` and rollback execution paths now use centralized HostFacts detection when tests or callers do not inject explicit facts.
+  - Default verifier probes receive the detected package-manager list.
+  - `opsforge doctor` now reports HostFacts, elevation, distro/version, provider config, risk settings, shell policy, and readiness warnings.
+  - Tests cover HostFacts detection, Linux elevation, Windows elevation, doctor warnings, and apply integration without mutating the host.
+
 ## Design Alignment Check
 
 | Spec Area | Status | Evidence | Notes |
 |---|---:|---|---|
 | §3 DSL | Partial | `packages/dsl`, `schemas/plan.schema.json` | Core schema and Plan JSON Schema export exist. Job/approval/inventory/audit schema artifacts remain. |
 | §4 Core pipeline | Partial | `packages/core/src/execute.ts`, `apps/cli/src/commands/run.ts`, `apps/cli/src/commands/rollback.ts`, `apps/cli/src/commands/verify.ts` | Deterministic spine exists, is reachable from NL via `run`, can manually replay stored verifications, recommends rollback by default on failure, and can auto-run rollback when explicitly requested. |
-| §4.1 Executor abstraction | Partial | `packages/executor-base` | Interfaces and injectable runner exist. Real host detection is still shallow. |
+| §4.1 Executor abstraction | Partial | `packages/executor-base`, `apps/cli/src/host-facts.ts` | Interfaces and injectable runner exist. CLI now builds real local HostFacts for OS, arch, package managers, distro/version, and elevation. Safe elevation flows remain open. |
 | §4.2 Linux executor | Partial | `packages/executor-linux` | Compile layer exists for apt/dnf/yum and systemd. Real safe file writing needs a later pass. |
-| §4.3 Windows executor | Partial | `packages/executor-windows` | Compile layer exists for winget/choco and services. UAC/admin detection remains open. |
+| §4.3 Windows executor | Partial | `packages/executor-windows`, `apps/cli/src/host-facts.ts` | Compile layer exists for winget/choco and services. Doctor can detect admin status with `net session`; safe UAC elevation flow remains open. |
 | §5 Policy and guard | Partial | `packages/policy` | Deterministic classifier/gate/guards exist. More rules and config knobs are needed. |
 | §6 Planner/provider layer | Partial | `packages/planner`, `packages/config`, `apps/cli/src/provider.ts` | Provider boundary, DSL validation, mock provider, persistent provider config, and OpenAI-compatible adapter exist. Anthropic/Google/Pi adapters, JSON retry/tool-call retry loops, model capability checks, and Pi sessions remain. |
-| §7.2 CLI mode | Partial | `apps/cli/src/commands` | `doctor`, `plan`, `plan --out`, `run`, `apply`, `verify`, `rollback`, `config provider/show`, and `audit ls/show` exist. `apply` and `run` support `--auto-rollback`; default verification now includes read-only host probes. |
+| §7.2 CLI mode | Partial | `apps/cli/src/commands` | `doctor`, `plan`, `plan --out`, `run`, `apply`, `verify`, `rollback`, `config provider/show`, and `audit ls/show` exist. `doctor` now reports richer HostFacts and readiness warnings; `apply` and `run` support `--auto-rollback`; default verification includes read-only host probes. |
 | §8 Audit | Partial | `packages/audit` | SQLite event store, stored Plan JSON, and stdout/stderr artifacts exist. Rich reports, retention/export, rollback audit views, and TUI timeline consumption remain. |
-| §11 Tests | Partial | package tests | Unit tests cover deterministic components, all current verifier variants, default verifier probe command generation, local TCP port checks, and do not mutate the host. |
+| §11 Tests | Partial | package tests | Unit tests cover deterministic components, all current verifier variants, default verifier probe command generation, local TCP port checks, HostFacts detection, doctor warnings, and do not mutate the host. |
 
 ## Remaining Implementation Estimate
 
-To finish the full Phase 1 MVP described in the design document, the project likely needs roughly 8-12 more plan-sized slices after Plan 12. The major remaining tracks are real host facts and `doctor` checks, safe file-write/template execution semantics, Anthropic and Google provider adapters, provider capability/retry loops, Pi runtime integration, TUI package and interaction flow, skill templates, and richer audit/export/reporting.
+To finish the full Phase 1 MVP described in the design document, the project likely needs roughly 7-11 more plan-sized slices after Plan 13. The major remaining tracks are safe file-write/template execution semantics, Anthropic and Google provider adapters, provider capability/retry loops, Pi runtime integration, TUI package and interaction flow, skill templates, safe elevation flows, and richer audit/export/reporting.
 
 ## Known Gaps
 
@@ -215,16 +226,16 @@ To finish the full Phase 1 MVP described in the design document, the project lik
 - TUI primary entry is not implemented; bare `opsforge` still prints a placeholder.
 - TUI inline rollback choice after failure is not implemented.
 - Verification replay is manual only; no scheduled or automatic verification loop exists yet.
-- Default verifier probes are basic; deeper host facts, elevation detection, package-manager edge cases, and `doctor` checks remain shallow.
+- Default verifier probes and HostFacts detection are basic; package-manager edge cases, distro-specific nuance, and safe elevation flows remain open.
 - Rollback reporting is basic and does not yet provide rich rollback views in audit output.
 - Audit retention/export and richer report generation are not implemented.
 - TUI timeline consumption of audit history is not implemented.
 - Model capability checks are not implemented.
 - Only the Plan JSON Schema artifact is exported; job, approval, inventory, and audit schema artifacts remain.
 - Generated plans are persisted as files, not yet in a first-class plan registry.
-- Real elevated privilege detection and safe elevation flows are incomplete.
+- Safe elevation flows are incomplete; current work detects elevated state but does not request or broker elevation.
 - Skill templates such as install-nginx/install-docker/install-nodejs are not implemented.
 
 ## Next Plan Recommendation
 
-Plan 13 should focus on real host facts, elevation detection, and deeper `opsforge doctor` checks. That would advance §4.1, §4.4, §7.2, §12, and the Windows UAC risk called out in §13 without introducing new mutation behavior.
+Plan 14 should focus on safe file-write and file-template execution semantics, including testable command compilation behavior, snapshot/artifact hooks where needed, and guard alignment for protected paths. That would advance §4.2, §4.3, §5.4, and §12 while keeping shell escape behavior unchanged.
