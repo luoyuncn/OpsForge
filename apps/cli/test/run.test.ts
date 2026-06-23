@@ -105,6 +105,36 @@ describe("buildRunCommand", () => {
     expect(parsed.plan.steps[0]).toEqual({ type: "package-install", name: "redis" });
     expect(parsed.result.commands[0].argv).toEqual(["apt-get", "install", "-y", "redis"]);
   });
+
+  it("forwards --auto-rollback into execution", async () => {
+    const writes: string[] = [];
+    const auditStore = createFakeAuditStore();
+    const command = buildRunCommand({
+      write: (text) => writes.push(text),
+      resolveProvider: async () => ({
+        name: "configured-test",
+        buildPlan: async () => ({
+          title: "Install nginx",
+          intent: "install",
+          steps: [{ type: "package-install", name: "nginx" }],
+          verifications: [{ type: "smoke-test", cmd: "false" }],
+          rollback: [{ type: "package-remove", name: "nginx" }],
+          risk: "L1",
+        }),
+      }),
+      now: () => "2026-06-23T00:00:00Z",
+      planId: () => "plan_run_auto_rollback",
+      platform: "linux",
+      facts,
+      auditStore,
+      runner: async () => ({ stdout: "", stderr: "", exitCode: 0 }),
+    });
+
+    await command.parseAsync(["node", "test", "install nginx", "--provider", "configured", "--auto-rollback"], { from: "user" });
+
+    expect(writes[0]).toContain("Rollback:           auto-executed");
+    expect(auditStore.events().map((event) => event.type)).toContain("run.rollback.started");
+  });
 });
 
 describe("formatRunResult", () => {
@@ -128,10 +158,15 @@ describe("formatRunResult", () => {
         gate: { allowed: true, reason: "risk gate passed" },
         commands: [],
         stepResults: [],
-        verificationResults: [],
-        auditEvents: [],
-        dryRun: true,
+      verificationResults: [],
+      rollback: {
+        autoExecuted: false,
+        available: false,
+        reason: "rollback not needed",
       },
+      auditEvents: [],
+      dryRun: true,
+    },
     });
 
     expect(output).toContain("OpsForge run");

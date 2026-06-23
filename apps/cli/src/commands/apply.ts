@@ -19,6 +19,7 @@ export interface ApplyOptions {
   json: boolean;
   riskMax: RiskLevel;
   allowShell: boolean;
+  autoRollback?: boolean;
 }
 
 export interface ExecutePlanDeps {
@@ -26,6 +27,7 @@ export interface ExecutePlanDeps {
   facts?: HostFacts;
   which?: WhichRunner;
   runner?: CommandRunner;
+  verifyDeps?: VerifyStoredPlanInput["verifyDeps"];
   auditStore?: AuditStore;
   config?: OpsForgeConfig;
 }
@@ -82,6 +84,12 @@ const factsFromHost = (os: DetectedOs, which: WhichRunner): HostFacts => {
 const executorForFacts = (facts: HostFacts) =>
   facts.osFamily === "windows" ? createWindowsExecutor() : createLinuxExecutor();
 
+const recordArtifacts = (audit: AuditStore, runId: string, stepResults: ExecutePlanResult["stepResults"]): void => {
+  for (const [index, stepResult] of stepResults.entries()) {
+    audit.recordStepArtifacts(runId, index, stepResult.stdout, stepResult.stderr);
+  }
+};
+
 export const executeParsedPlan = async (
   plan: Plan,
   options: ApplyOptions,
@@ -103,12 +111,12 @@ export const executeParsedPlan = async (
       riskMax: options.riskMax,
       allowShell: options.allowShell,
       runner: deps.runner ?? defaultRunner,
-      verifyDeps: {},
+      verifyDeps: deps.verifyDeps ?? createDefaultVerifyDeps(),
+      autoRollback: options.autoRollback ?? false,
     });
 
-    for (const [index, stepResult] of result.stepResults.entries()) {
-      audit.recordStepArtifacts(result.runId, index, stepResult.stdout, stepResult.stderr);
-    }
+    recordArtifacts(audit, result.runId, result.stepResults);
+    if (result.rollback.result) recordArtifacts(audit, result.rollback.result.runId, result.rollback.result.stepResults);
 
     return { ...result, dryRun: options.dryRun };
   } finally {
@@ -140,11 +148,10 @@ export const executeRollbackPlan = async (
       allowShell: options.allowShell,
       runner: deps.runner ?? defaultRunner,
       verifyDeps: {},
+      autoRollback: false,
     });
 
-    for (const [index, stepResult] of result.stepResults.entries()) {
-      audit.recordStepArtifacts(result.runId, index, stepResult.stdout, stepResult.stderr);
-    }
+    recordArtifacts(audit, result.runId, result.stepResults);
 
     return { ...result, dryRun: options.dryRun };
   } finally {
@@ -163,6 +170,19 @@ export const buildApplyCommand = (deps: BuildApplyDeps = {}) => async (
 };
 
 export const formatApplyResult = (result: ApplyResult): string => {
+  const rollbackLines = result.rollback.autoExecuted
+    ? [
+      `  Rollback:           auto-executed (${result.rollback.reason})`,
+      `  Rollback run ID:    ${result.rollback.result?.runId ?? ""}`,
+    ]
+    : result.rollback.available
+      ? [
+        `  Rollback:           recommended (${result.rollback.reason})`,
+        `  Suggested command:  ${result.rollback.suggestedCommand ?? ""}`,
+      ]
+      : result.rollback.trigger
+        ? [`  Rollback:           unavailable (${result.rollback.reason})`]
+        : ["  Rollback:           not needed"];
   const lines = [
     "OpsForge apply",
     `  Run ID:             ${result.runId}`,
@@ -173,6 +193,7 @@ export const formatApplyResult = (result: ApplyResult): string => {
     ...result.commands.map((command, index) => `    ${index + 1}. [${command.shell}] ${commandToText(command.argv)} — ${command.describe}`),
     `  Step results:       ${result.stepResults.length}`,
     `  Verifications:      ${result.verificationResults.length}`,
+    ...rollbackLines,
   ];
   return lines.join("\n");
 };

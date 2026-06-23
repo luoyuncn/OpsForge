@@ -46,7 +46,8 @@ program
   .option("--json", "输出 JSON", false)
   .option("--risk-max <level>", "允许的最高风险等级", "L3")
   .option("--allow-shell", "允许 shell 逃生舱步骤", false)
-  .action(async (planJson: string, options: { dryRun: boolean; yes: boolean; json: boolean; riskMax: string; allowShell: boolean }) => {
+  .option("--auto-rollback", "验证或执行失败后自动回滚", false)
+  .action(async (planJson: string, options: { dryRun: boolean; yes: boolean; json: boolean; riskMax: string; allowShell: boolean; autoRollback: boolean }) => {
     const apply = buildApplyCommand();
     const result = await apply(planJson, {
       dryRun: options.dryRun,
@@ -54,6 +55,7 @@ program
       json: options.json,
       riskMax: parseRiskMax(options.riskMax),
       allowShell: options.allowShell,
+      autoRollback: options.autoRollback,
     });
     console.log(options.json ? JSON.stringify(result, null, 2) : formatApplyResult(result));
     if (!result.gate.allowed) process.exitCode = 1;

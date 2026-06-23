@@ -122,6 +122,50 @@ describe("executePlan", () => {
       "run.verified",
     ]);
   });
+
+  it("recommends manual rollback when verification fails and auto rollback is disabled", async () => {
+    const audit = createMemoryAuditRecorder();
+    const result = await executePlan({
+      plan: { ...basePlan, rollback: [{ type: "package-remove", name: "nginx" }] },
+      executor,
+      facts,
+      audit,
+      dryRun: false,
+      yes: true,
+      riskMax: "L3",
+      allowShell: false,
+      runner: async () => ({ stdout: "ok", stderr: "", exitCode: 0 }),
+      verifyDeps: { runCommand: async () => ({ stdout: "", stderr: "", exitCode: 1 }) },
+    });
+
+    expect(result.rollback.trigger).toBe("verification-failed");
+    expect(result.rollback.autoExecuted).toBe(false);
+    expect(result.rollback.suggestedCommand).toBe(`opsforge rollback ${result.runId}`);
+    expect(audit.events().map((event) => event.type)).not.toContain("run.rollback.started");
+  });
+
+  it("auto-executes rollback when verification fails and auto rollback is enabled", async () => {
+    const audit = createMemoryAuditRecorder();
+    const result = await executePlan({
+      plan: { ...basePlan, rollback: [{ type: "package-remove", name: "nginx" }] },
+      executor,
+      facts,
+      audit,
+      dryRun: false,
+      yes: true,
+      riskMax: "L3",
+      allowShell: false,
+      autoRollback: true,
+      runner: async () => ({ stdout: "ok", stderr: "", exitCode: 0 }),
+      verifyDeps: { runCommand: async () => ({ stdout: "", stderr: "", exitCode: 1 }) },
+    });
+
+    expect(result.rollback.trigger).toBe("verification-failed");
+    expect(result.rollback.autoExecuted).toBe(true);
+    expect(result.rollback.result?.stepResults[0].step).toEqual({ type: "package-remove", name: "nginx" });
+    expect(audit.events().map((event) => event.type)).toContain("run.rollback.started");
+    expect(audit.events().map((event) => event.type)).toContain("run.rollback.finished");
+  });
 });
 
 describe("rollbackPlan", () => {

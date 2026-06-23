@@ -46,6 +46,7 @@ export const buildRunCommand = (deps: BuildRunCommandDeps = {}): Command => {
     .option("--json", "输出 JSON", false)
     .option("--risk-max <level>", "允许的最高风险等级", "L3")
     .option("--allow-shell", "允许 shell 逃生舱步骤", false)
+    .option("--auto-rollback", "验证或执行失败后自动回滚", false)
     .option("--provider <mode>", "Provider mode: mock, configured, or openai-compatible", "mock")
     .option("--model <id>", "Provider model id")
     .option("--base-url <url>", "OpenAI-compatible base URL")
@@ -59,6 +60,7 @@ export const buildRunCommand = (deps: BuildRunCommandDeps = {}): Command => {
           json: boolean;
           riskMax: string;
           allowShell: boolean;
+          autoRollback: boolean;
           provider: string;
           model?: string;
           baseUrl?: string;
@@ -87,6 +89,7 @@ export const buildRunCommand = (deps: BuildRunCommandDeps = {}): Command => {
         json: options.json,
         riskMax: parseRiskMax(options.riskMax),
         allowShell: options.allowShell,
+        autoRollback: options.autoRollback,
       };
       const result = await executeParsedPlan(plan, applyOptions, deps);
       const payload = { plan, result };

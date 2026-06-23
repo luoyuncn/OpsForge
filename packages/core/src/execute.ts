@@ -16,6 +16,7 @@ export interface ExecutePlanInput {
   allowShell: boolean;
   runner: CommandRunner;
   verifyDeps: VerifyDeps;
+  autoRollback?: boolean;
 }
 
 export interface RollbackPlanInput extends ExecutePlanInput {
@@ -36,7 +37,19 @@ export interface ExecutePlanResult {
   commands: CompiledCommand[];
   stepResults: StepResult[];
   verificationResults: VerificationResult[];
+  rollback: RollbackOutcome;
   auditEvents: ReturnType<AuditRecorder["events"]>;
+}
+
+export type RollbackTrigger = "step-failed" | "verification-failed";
+
+export interface RollbackOutcome {
+  trigger?: RollbackTrigger;
+  autoExecuted: boolean;
+  available: boolean;
+  reason: string;
+  suggestedCommand?: string;
+  result?: ExecutePlanResult;
 }
 
 export interface VerifyStoredPlanResult {
@@ -46,6 +59,12 @@ export interface VerifyStoredPlanResult {
 }
 
 const now = (): string => new Date().toISOString();
+
+const emptyRollbackOutcome = (): RollbackOutcome => ({
+  autoExecuted: false,
+  available: false,
+  reason: "rollback not needed",
+});
 
 const compileAndGuard = (input: ExecutePlanInput): { commands: CompiledCommand[]; gate?: GateDecision } => {
   const commands: CompiledCommand[] = [];
@@ -85,6 +104,39 @@ const runCompiledSteps = async (
   return stepResults;
 };
 
+const detectRollbackTrigger = (
+  commands: CompiledCommand[],
+  stepResults: StepResult[],
+  verificationResults: VerificationResult[],
+): RollbackTrigger | undefined => {
+  if (stepResults.some((result) => result.exitCode !== 0) || stepResults.length < commands.length) return "step-failed";
+  if (verificationResults.some((result) => !result.ok)) return "verification-failed";
+  return undefined;
+};
+
+const buildRollbackOutcome = async (
+  input: ExecutePlanInput,
+  runId: string,
+  trigger: RollbackTrigger | undefined,
+): Promise<RollbackOutcome> => {
+  if (!trigger) return emptyRollbackOutcome();
+  if (input.plan.rollback.length === 0) {
+    return { trigger, autoExecuted: false, available: false, reason: "rollback unavailable: plan has no rollback steps" };
+  }
+  if (!input.autoRollback) {
+    return {
+      trigger,
+      autoExecuted: false,
+      available: true,
+      reason: `rollback recommended after ${trigger}`,
+      suggestedCommand: `opsforge rollback ${runId}`,
+    };
+  }
+
+  const result = await rollbackPlan({ ...input, originalRunId: runId, dryRun: false, autoRollback: false });
+  return { trigger, autoExecuted: true, available: true, reason: `rollback executed after ${trigger}`, result };
+};
+
 export const executePlan = async (input: ExecutePlanInput): Promise<ExecutePlanResult> => {
   const runId = createRunId(input.plan.id);
   const classified = classifyPlanRisk(input.plan);
@@ -108,6 +160,7 @@ export const executePlan = async (input: ExecutePlanInput): Promise<ExecutePlanR
       commands: [],
       stepResults: [],
       verificationResults: [],
+      rollback: emptyRollbackOutcome(),
       auditEvents: input.audit.events(),
     };
   }
@@ -127,6 +180,7 @@ export const executePlan = async (input: ExecutePlanInput): Promise<ExecutePlanR
       commands: [],
       stepResults: [],
       verificationResults: [],
+      rollback: emptyRollbackOutcome(),
       auditEvents: input.audit.events(),
     };
   }
@@ -141,6 +195,7 @@ export const executePlan = async (input: ExecutePlanInput): Promise<ExecutePlanR
       commands: compiled.commands,
       stepResults: [],
       verificationResults: [],
+      rollback: emptyRollbackOutcome(),
       auditEvents: input.audit.events(),
     };
   }
@@ -151,6 +206,11 @@ export const executePlan = async (input: ExecutePlanInput): Promise<ExecutePlanR
 
   const verificationResults = await verifyPlan(input.plan.verifications, input.verifyDeps);
   input.audit.record({ type: "run.verified", at: now(), payload: { runId, results: verificationResults } });
+  const rollback = await buildRollbackOutcome(
+    input,
+    runId,
+    detectRollbackTrigger(compiled.commands, stepResults, verificationResults),
+  );
 
   return {
     runId,
@@ -159,6 +219,7 @@ export const executePlan = async (input: ExecutePlanInput): Promise<ExecutePlanR
     commands: compiled.commands,
     stepResults,
     verificationResults,
+    rollback,
     auditEvents: input.audit.events(),
   };
 };
@@ -202,6 +263,7 @@ export const rollbackPlan = async (input: RollbackPlanInput): Promise<ExecutePla
       commands: [],
       stepResults: [],
       verificationResults: [],
+      rollback: emptyRollbackOutcome(),
       auditEvents: rollbackInput.audit.events(),
     };
   }
@@ -222,6 +284,7 @@ export const rollbackPlan = async (input: RollbackPlanInput): Promise<ExecutePla
       commands: [],
       stepResults: [],
       verificationResults: [],
+      rollback: emptyRollbackOutcome(),
       auditEvents: rollbackInput.audit.events(),
     };
   }
@@ -238,6 +301,7 @@ export const rollbackPlan = async (input: RollbackPlanInput): Promise<ExecutePla
       commands: compiled.commands,
       stepResults: [],
       verificationResults: [],
+      rollback: emptyRollbackOutcome(),
       auditEvents: rollbackInput.audit.events(),
     };
   }
@@ -252,6 +316,7 @@ export const rollbackPlan = async (input: RollbackPlanInput): Promise<ExecutePla
     commands: compiled.commands,
     stepResults,
     verificationResults: [],
+    rollback: emptyRollbackOutcome(),
     auditEvents: rollbackInput.audit.events(),
   };
 };

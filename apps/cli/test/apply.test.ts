@@ -109,3 +109,30 @@ describe("buildApplyCommand", () => {
     ]);
   });
 });
+
+describe("formatApplyResult", () => {
+  it("prints rollback recommendation when verification fails without auto rollback", async () => {
+    const output = formatApplyResult({
+      runId: "run_plan_1",
+      risk: "L1",
+      gate: { allowed: true, reason: "risk gate passed" },
+      commands: [],
+      stepResults: [],
+      verificationResults: [
+        { verification: { type: "smoke-test", cmd: "false" }, ok: false, message: "smoke-test exited 1" },
+      ],
+      rollback: {
+        trigger: "verification-failed",
+        autoExecuted: false,
+        available: true,
+        reason: "rollback recommended after verification-failed",
+        suggestedCommand: "opsforge rollback run_plan_1",
+      },
+      auditEvents: [],
+      dryRun: false,
+    });
+
+    expect(output).toContain("Rollback:           recommended (rollback recommended after verification-failed)");
+    expect(output).toContain("Suggested command:  opsforge rollback run_plan_1");
+  });
+});

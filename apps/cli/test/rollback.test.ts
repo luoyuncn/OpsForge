@@ -101,6 +101,11 @@ describe("formatRollbackResult", () => {
       commands: [],
       stepResults: [],
       verificationResults: [],
+      rollback: {
+        autoExecuted: false,
+        available: false,
+        reason: "rollback not needed",
+      },
       auditEvents: [],
       dryRun: true,
     });
