@@ -18,6 +18,7 @@ Implemented plans:
 - Plan 4: `docs/superpowers/plans/2026-06-23-opsforge-plan-4-planner-provider-scaffold.md`
 - Plan 5: `docs/superpowers/plans/2026-06-23-opsforge-plan-5-json-schema-plan-output.md`
 - Plan 6: `docs/superpowers/plans/2026-06-23-opsforge-plan-6-cli-run-flow.md`
+- Plan 7: `docs/superpowers/plans/2026-06-23-opsforge-plan-7-provider-config-openai-adapter.md`
 
 ## Delivered In Plan 1
 
@@ -109,6 +110,24 @@ Implemented plans:
   - `opsforge run "<NL>" --dry-run --json` emits both the generated Plan and execution result.
   - `apply` now delegates parsed Plan execution through `executeParsedPlan()`, keeping file-based and NL-based flows aligned.
 
+## Delivered In Plan 7
+
+- `@opsforge/config`
+  - Provider config can be persisted to and loaded from `~/.opsforge/config.json`.
+  - OpenAI-compatible env inference now defaults to `gpt-4.1-mini`, `https://api.openai.com/v1`, and `OPENAI_API_KEY`.
+  - Provider config includes `apiKeyEnv` so credentials stay in environment variables rather than config files.
+
+- `@opsforge/planner`
+  - `createOpenAICompatiblePlanProvider()` calls OpenAI-compatible `/chat/completions` endpoints with JSON-mode response format.
+  - Adapter tests use mocked HTTP responses and still validate through the existing DSL parser.
+  - Provider failures surface as typed OpenAI-compatible provider errors.
+
+- `@opsforge/cli`
+  - `opsforge config provider openai-compatible ...` writes provider settings.
+  - `opsforge config show [--json]` displays local config.
+  - `opsforge plan/run --provider configured` resolves local config into the planner provider.
+  - `opsforge plan/run --provider openai-compatible` can be driven directly from CLI flags and environment variables.
+
 ## Design Alignment Check
 
 | Spec Area | Status | Evidence | Notes |
@@ -119,21 +138,21 @@ Implemented plans:
 | §4.2 Linux executor | Partial | `packages/executor-linux` | Compile layer exists for apt/dnf/yum and systemd. Real safe file writing needs a later pass. |
 | §4.3 Windows executor | Partial | `packages/executor-windows` | Compile layer exists for winget/choco and services. UAC/admin detection remains open. |
 | §5 Policy and guard | Partial | `packages/policy` | Deterministic classifier/gate/guards exist. More rules and config knobs are needed. |
-| §6 Planner/provider layer | Partial | `packages/planner` | Provider boundary, DSL validation, and mock provider exist. Real OpenAI/Anthropic/Google/Pi adapters, JSON retry, and Pi sessions remain. |
-| §7.2 CLI mode | Partial | `apps/cli/src/commands` | `doctor`, `plan`, `plan --out`, `run`, `apply`, and `audit ls/show` exist. `verify/rollback/config` remain. |
+| §6 Planner/provider layer | Partial | `packages/planner`, `packages/config`, `apps/cli/src/provider.ts` | Provider boundary, DSL validation, mock provider, persistent provider config, and OpenAI-compatible adapter exist. Anthropic/Google/Pi adapters, JSON retry/tool-call retry loops, model capability checks, and Pi sessions remain. |
+| §7.2 CLI mode | Partial | `apps/cli/src/commands` | `doctor`, `plan`, `plan --out`, `run`, `apply`, `config provider/show`, and `audit ls/show` exist. `verify/rollback` remain. |
 | §8 Audit | Partial | `packages/audit` | SQLite event store and stdout/stderr artifacts exist. Rich reports, retention/export, rollback audit views, and TUI timeline consumption remain. |
 | §11 Tests | Partial | package tests | Unit tests cover deterministic components and do not mutate the host. |
 
 ## Known Gaps
 
-- Real LLM planner adapters and Pi runtime are not implemented.
+- Anthropic, Google, and Pi planner adapters plus Pi runtime are not implemented.
 - Planner JSON-mode retry/tool-call retry loops are not implemented.
 - TUI primary entry is not implemented; bare `opsforge` still prints a placeholder.
 - Rollback orchestration and CLI `rollback` are not implemented.
-- CLI `verify` and `config` subcommands are not implemented.
+- CLI `verify` is not implemented.
 - Audit retention/export and richer report generation are not implemented.
 - TUI timeline consumption of audit history is not implemented.
-- Provider configuration commands, real provider adapters, and model capability checks are not implemented.
+- Model capability checks are not implemented.
 - Only the Plan JSON Schema artifact is exported; job, approval, inventory, and audit schema artifacts remain.
 - Generated plans are persisted as files, not yet in a first-class plan registry.
 - Real elevated privilege detection and safe elevation flows are incomplete.
@@ -141,9 +160,9 @@ Implemented plans:
 
 ## Next Plan Recommendation
 
-Plan 7 should focus on either:
+Plan 8 should focus on either:
 
-1. provider configuration commands and a real OpenAI-compatible planner adapter with mocked HTTP tests, or
-2. rollback orchestration plus CLI `rollback <run_id>` using existing audit/run records.
+1. rollback orchestration plus CLI `rollback <run_id>` using existing audit/run records, or
+2. `opsforge verify <run_id>` to replay stored verification specs against persisted run records.
 
-The safer next slice is provider configuration plus a mocked OpenAI-compatible adapter because `run` now exposes the full NL path while still using the deterministic mock provider.
+The safer next slice is rollback orchestration because persisted audit records and rollback steps already exist, while the core pipeline still lacks the §4 rollback branch.
