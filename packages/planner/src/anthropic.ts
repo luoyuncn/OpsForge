@@ -25,16 +25,6 @@ interface AnthropicMessagesResponse {
 
 const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, "");
 
-const parseJsonObject = (content: string): unknown => {
-  try {
-    return JSON.parse(content);
-  } catch (error) {
-    throw new AnthropicProviderError(
-      `Anthropic provider returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-};
-
 export const createAnthropicPlanProvider = (options: AnthropicProviderOptions): PlanProvider => {
   const baseUrl = trimTrailingSlash(options.baseUrl ?? "https://api.anthropic.com");
   const fetchImpl = options.fetch ?? fetch;
@@ -85,7 +75,7 @@ export const createAnthropicPlanProvider = (options: AnthropicProviderOptions): 
         throw new AnthropicProviderError("Anthropic provider response did not include text content");
       }
 
-      return parseJsonObject(content);
+      return content;
     },
   };
 };

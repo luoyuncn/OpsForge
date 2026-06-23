@@ -31,6 +31,8 @@ import {
 } from "./timeline";
 import { reduceTuiKeyInput, type TuiUserAction } from "./controls";
 import { createInitialTuiState, reduceTuiEvents, type TuiEvent, type TuiState } from "./state";
+import { selectStatusViewModel, type StatusViewModel } from "./state/selectors";
+import { createRuntimeError, type TuiStructuredError } from "./domain/errors";
 
 export {
   reduceTuiKeyInput,
@@ -60,6 +62,24 @@ export {
 export {
   runtimeEventToTuiEvent,
 } from "./runtime-adapter";
+
+export {
+  parseInput,
+  type InputIntent,
+} from "./commands/parseInput";
+
+export {
+  createRuntimeError,
+  createUnknownCommandError,
+  type TuiStructuredError,
+  type TuiErrorPhase,
+} from "./domain/errors";
+
+export {
+  selectStatusViewModel,
+  type StatusViewModel,
+  type StatusViewLevel,
+} from "./state/selectors";
 
 export {
   createTuiPlanCard,
@@ -103,6 +123,7 @@ export interface TuiStatus {
   auditDetail?: AuditRunReport;
   thinkingText?: string;
   errorText?: string;
+  error?: TuiStructuredError;
   inputDraft?: string;
   lastSubmittedPrompt?: string;
 }
@@ -121,6 +142,7 @@ export interface TuiLaunchOptions {
   auditDetail?: AuditRunReport;
   thinkingText?: string;
   errorText?: string;
+  error?: TuiStructuredError;
   inputDraft?: string;
   lastSubmittedPrompt?: string;
 }
@@ -139,6 +161,7 @@ export const createTuiStatus = (options: TuiLaunchOptions): TuiStatus => ({
   auditDetail: options.auditDetail,
   thinkingText: options.thinkingText,
   errorText: options.errorText,
+  error: options.error ?? (options.errorText ? createRuntimeError(options.errorText) : undefined),
   inputDraft: options.inputDraft,
   lastSubmittedPrompt: options.lastSubmittedPrompt,
 });
@@ -165,12 +188,14 @@ const truncateText = (value: string, limit = STATUS_TEXT_LIMIT): string => {
 const providerConfigured = (provider: string): boolean =>
   provider !== "未配置" && provider.toLowerCase() !== "unconfigured";
 
+const selectStatusForRender = (status: TuiStatus): StatusViewModel =>
+  selectStatusViewModel(createInitialTuiState(status));
+
 const formatStatusLine = (status: TuiStatus): string => {
-  if (status.errorText) return `Error: ${truncateText(status.errorText)}`;
-  if (status.thinkingText) return `Thinking: ${truncateText(status.thinkingText)}`;
-  if (!providerConfigured(status.provider)) return "Ready: configure a provider before running live tasks.";
-  if (status.planCard || status.timeline) return "Ready: review the current run state below.";
-  return "Ready: type a local operations task below.";
+  const view = selectStatusForRender(status);
+  if (view.level === "error") return `Error: ${view.summary}`;
+  if (view.level === "busy") return `Thinking: ${view.summary}`;
+  return view.summary;
 };
 
 const workspacePlaceholder = (status: TuiStatus): string =>
@@ -257,11 +282,14 @@ const Panel = ({ title, children, width, marginTop = 0 }: PanelProps): React.Rea
 );
 
 const StatusView = ({ status }: TuiAppProps): React.ReactElement => {
-  const needsProvider = !providerConfigured(status.provider);
-  const hasError = Boolean(status.errorText);
+  const view = selectStatusForRender(status);
+  const color = view.level === "error" ? "red" : view.level === "warn" ? "yellow" : view.level === "busy" ? "cyan" : "green";
   return (
     <Panel title="Status" width={TUI_WIDTH} marginTop={1}>
-      <Text color={hasError ? "red" : needsProvider ? "yellow" : "green"}>{formatStatusLine(status)}</Text>
+      <Text color={color}>{formatStatusLine(status)}</Text>
+      {view.level === "error" ? <Text color="gray">{view.title}</Text> : null}
+      {view.details.slice(0, 2).map((detail) => <Text key={detail} color="gray">- {truncateText(detail)}</Text>)}
+      {view.suggestedAction ? <Text color="gray">Next: {truncateText(view.suggestedAction)}</Text> : null}
       <Text color="gray">Flow: plan - approve - execute - verify - audit - rollback</Text>
     </Panel>
   );

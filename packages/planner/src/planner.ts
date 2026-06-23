@@ -1,5 +1,6 @@
 import { PlanSchema, type Plan } from "@opsforge/dsl";
 import { OpsForgeError } from "@opsforge/shared";
+import { extractPlanCandidate } from "./plan-extract";
 import type { PlanProvider } from "./providers";
 
 export class PlannerValidationError extends OpsForgeError {
@@ -39,7 +40,8 @@ export const buildPlanFromPrompt = async (input: BuildPlanInput): Promise<Plan> 
 
   for (let attempt = 0; attempt <= maxRepairAttempts; attempt += 1) {
     const generated = await input.provider.buildPlan({ prompt });
-    const candidate = withDefaults(generated, id, createdAt);
+    const extracted = extractPlanCandidate(generated);
+    const candidate = withDefaults(extracted.candidate, id, createdAt);
     const parsed = PlanSchema.safeParse(candidate);
     if (parsed.success) return parsed.data;
 

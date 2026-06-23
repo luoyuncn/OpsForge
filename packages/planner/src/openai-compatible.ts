@@ -26,16 +26,6 @@ interface ChatCompletionResponse {
 
 const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, "");
 
-const parseJsonObject = (content: string): unknown => {
-  try {
-    return JSON.parse(content);
-  } catch (error) {
-    throw new OpenAICompatibleProviderError(
-      `OpenAI-compatible provider returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-};
-
 export const createOpenAICompatiblePlanProvider = (options: OpenAICompatibleProviderOptions): PlanProvider => {
   const baseUrl = trimTrailingSlash(options.baseUrl ?? "https://api.openai.com/v1");
   const fetchImpl = options.fetch ?? fetch;
@@ -91,7 +81,7 @@ export const createOpenAICompatiblePlanProvider = (options: OpenAICompatibleProv
         throw new OpenAICompatibleProviderError("OpenAI-compatible provider response did not include message content");
       }
 
-      return parseJsonObject(content);
+      return content;
     },
   };
 };

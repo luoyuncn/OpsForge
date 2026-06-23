@@ -4,7 +4,7 @@ import type { Plan } from "@opsforge/dsl";
 import type { HostFacts } from "@opsforge/executor-base";
 import { createRuntimeActionController, type RuntimeEvent } from "@opsforge/pi-runtime";
 import { buildPlanFromPrompt, PlannerValidationError, type PlanProvider } from "@opsforge/planner";
-import { runtimeEventToTuiEvent, type TuiActionHandler, type TuiEvent } from "@opsforge/tui";
+import { runtimeEventToTuiEvent, type TuiActionHandler, type TuiEvent, type TuiStructuredError } from "@opsforge/tui";
 import { executeParsedPlan, executeRollbackPlan, parseRiskMax, type ApplyResult, type ExecutePlanDeps } from "./commands/apply";
 import { resolvePlanProvider, type PlanProviderResolver } from "./provider";
 
@@ -34,10 +34,31 @@ const formatRuntimeError = (error: unknown): string => {
   return `Runtime error: ${error instanceof Error ? error.message : String(error)}`;
 };
 
+const toTuiStructuredError = (error: unknown): TuiStructuredError => {
+  if (error instanceof PlannerValidationError) {
+    return {
+      phase: "validate",
+      type: "INVALID_SCHEMA",
+      summary: "Provider returned invalid OpsForge Plan DSL.",
+      details: [error.message],
+      retryable: true,
+      suggestedAction: "Try a concrete local-ops task, or switch models/provider.",
+    };
+  }
+
+  return {
+    phase: "runtime",
+    type: "RUNTIME_ERROR",
+    summary: formatRuntimeError(error),
+    retryable: true,
+    suggestedAction: "Review the runtime error, adjust the task/provider, then retry.",
+  };
+};
+
 const errorToTuiEvent = (error: unknown): TuiEvent[] => [
   {
     type: "runtime.error",
-    message: formatRuntimeError(error),
+    error: toTuiStructuredError(error),
   },
 ];
 

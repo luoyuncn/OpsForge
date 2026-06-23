@@ -20,6 +20,8 @@ import {
   reduceTuiKeyInput,
   type TuiActionHandler,
 } from "../src/index";
+import { parseInput } from "../src/commands/parseInput";
+import { selectStatusViewModel } from "../src/state/selectors";
 import { runtimeEventToTuiEvent } from "../src/runtime-adapter";
 
 const linuxFacts: HostFacts = {
@@ -540,6 +542,30 @@ describe("reduceTuiEvent", () => {
     expect(snapshot).not.toContain("Planning with the configured provider...Provider");
   });
 
+  it("stores structured runtime errors for status selectors", () => {
+    let state = createInitialTuiState(createTuiStatus({ facts: linuxFacts, provider: "mock" }));
+    state = reduceTuiEvent(state, {
+      type: "runtime.error",
+      error: {
+        phase: "planning",
+        type: "INVALID_SCHEMA",
+        summary: "Provider returned invalid OpsForge Plan DSL.",
+        details: ["steps.0.type: Invalid discriminator value"],
+        retryable: true,
+        suggestedAction: "Try a concrete local-ops task, or switch models/provider.",
+      },
+    });
+
+    expect(state.status.error?.type).toBe("INVALID_SCHEMA");
+    expect(state.status.errorText).toBe("Provider returned invalid OpsForge Plan DSL.");
+
+    const view = selectStatusViewModel(state);
+    expect(view.level).toBe("error");
+    expect(view.title).toBe("Planning error: INVALID_SCHEMA");
+    expect(view.summary).toBe("Provider returned invalid OpsForge Plan DSL.");
+    expect(view.suggestedAction).toBe("Try a concrete local-ops task, or switch models/provider.");
+  });
+
   it("builds renderable plan, execution, approval, and rollback state from events", () => {
     let state = createInitialTuiState(createTuiStatus({ facts: linuxFacts, provider: "mock" }));
     state = reduceTuiEvent(state, { type: "plan.ready", plan: nginxPlan });
@@ -707,7 +733,29 @@ describe("runtimeEventToTuiEvent", () => {
       },
     })).toBeUndefined();
     expect(runtimeEventToTuiEvent({ type: "runtime.error", message: "provider failed", recoverable: true }))
-      .toEqual({ type: "runtime.error", message: "provider failed" });
+      .toEqual({
+        type: "runtime.error",
+        error: {
+          phase: "runtime",
+          type: "RUNTIME_ERROR",
+          summary: "provider failed",
+          retryable: true,
+          suggestedAction: "Review the runtime error, adjust the task/provider, then retry.",
+        },
+      });
+  });
+});
+
+describe("parseInput", () => {
+  it("classifies supported slash commands without routing them to the provider", () => {
+    expect(parseInput("/provider")).toEqual({ kind: "command", name: "provider", args: [], raw: "/provider" });
+    expect(parseInput("/history")).toEqual({ kind: "command", name: "history", args: [], raw: "/history" });
+    expect(parseInput("/audit 1")).toEqual({ kind: "command", name: "audit", args: ["1"], raw: "/audit 1" });
+  });
+
+  it("keeps unknown slash commands local and plain language as tasks", () => {
+    expect(parseInput("/wat now")).toEqual({ kind: "command", name: "wat", args: ["now"], raw: "/wat now" });
+    expect(parseInput("install nginx")).toEqual({ kind: "task", text: "install nginx" });
   });
 });
 
@@ -837,5 +885,6 @@ describe("reduceTuiKeyInput", () => {
 
     expect(unknownResult.action).toBeUndefined();
     expect(unknownResult.state.status.errorText).toBe("Unknown command: /unknown. Available commands: /provider, /history, /audit <n>.");
+    expect(unknownResult.state.status.error?.type).toBe("UNKNOWN_COMMAND");
   });
 });

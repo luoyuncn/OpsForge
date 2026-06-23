@@ -125,6 +125,56 @@ describe("buildPlanFromPrompt", () => {
     expect(prompts[1]).toContain("\"type\":\"unknown\"");
   });
 
+  it("extracts a JSON plan from fenced provider text before schema validation", async () => {
+    const plan = await buildPlanFromPrompt({
+      prompt: "install nginx",
+      provider: {
+        name: "fenced",
+        buildPlan: async () => [
+          "Here is the safe plan:",
+          "```json",
+          JSON.stringify({
+            title: "Install nginx",
+            intent: "install",
+            steps: [{ type: "package-install", name: "nginx" }],
+            risk: "L1",
+          }),
+          "```",
+        ].join("\n"),
+      },
+      now: () => "2026-06-23T00:00:00Z",
+      planId: () => "plan_fenced",
+    });
+
+    expect(plan.id).toBe("plan_fenced");
+    expect(plan.steps[0]).toEqual({ type: "package-install", name: "nginx" });
+  });
+
+  it("extracts the largest JSON object from mixed provider text", async () => {
+    const plan = await buildPlanFromPrompt({
+      prompt: "install redis",
+      provider: {
+        name: "mixed",
+        buildPlan: async () => [
+          "I will not execute anything.",
+          "{\"note\":\"small\"}",
+          "Plan follows:",
+          JSON.stringify({
+            title: "Install redis",
+            intent: "install",
+            steps: [{ type: "package-install", name: "redis" }],
+            risk: "L1",
+          }),
+        ].join("\n"),
+      },
+      now: () => "2026-06-23T00:00:00Z",
+      planId: () => "plan_mixed",
+    });
+
+    expect(plan.id).toBe("plan_mixed");
+    expect(plan.steps[0]).toEqual({ type: "package-install", name: "redis" });
+  });
+
   it("throws after the configured repair attempt budget is exhausted", async () => {
     let calls = 0;
 
@@ -196,6 +246,45 @@ describe("createOpenAICompatiblePlanProvider", () => {
     expect(body.messages.at(-1).content).toContain("install-nginx");
     expect(body.messages.at(-1).content).toContain("install-docker");
     expect(body.messages.at(-1).content).toContain("install-nodejs");
+  });
+
+  it("lets the planner extract fenced JSON from OpenAI-compatible provider text", async () => {
+    const provider = createOpenAICompatiblePlanProvider({
+      apiKey: "test-key",
+      model: "gpt-5.5",
+      baseUrl: "https://llm.example.com/v1",
+      fetch: async () => new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: [
+                  "```json",
+                  JSON.stringify({
+                    title: "Install nginx",
+                    intent: "install",
+                    steps: [{ type: "package-install", name: "nginx" }],
+                    risk: "L1",
+                  }),
+                  "```",
+                ].join("\n"),
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    });
+
+    const plan = await buildPlanFromPrompt({
+      prompt: "install nginx",
+      provider,
+      planId: () => "plan_openai_fenced",
+      now: () => "2026-06-23T00:00:00Z",
+    });
+
+    expect(plan.id).toBe("plan_openai_fenced");
+    expect(plan.steps[0]).toEqual({ type: "package-install", name: "nginx" });
   });
 
   it("throws a typed error for non-2xx responses", async () => {

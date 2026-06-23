@@ -28,16 +28,6 @@ interface GoogleGenerateContentResponse {
 
 const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, "");
 
-const parseJsonObject = (content: string): unknown => {
-  try {
-    return JSON.parse(content);
-  } catch (error) {
-    throw new GoogleProviderError(
-      `Google provider returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-};
-
 export const createGooglePlanProvider = (options: GoogleProviderOptions): PlanProvider => {
   const baseUrl = trimTrailingSlash(options.baseUrl ?? "https://generativelanguage.googleapis.com/v1beta");
   const fetchImpl = options.fetch ?? fetch;
@@ -90,7 +80,7 @@ export const createGooglePlanProvider = (options: GoogleProviderOptions): PlanPr
         throw new GoogleProviderError("Google provider response did not include text content");
       }
 
-      return parseJsonObject(content);
+      return content;
     },
   };
 };

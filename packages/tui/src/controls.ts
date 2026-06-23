@@ -1,4 +1,6 @@
 import { reduceTuiEvent, type TuiState } from "./state";
+import { parseInput, type InputIntent } from "./commands/parseInput";
+import { createUnknownCommandError } from "./domain/errors";
 
 export interface TuiKeyInput {
   return?: boolean;
@@ -76,14 +78,13 @@ const handleApprovalInput = (state: TuiState, input: string, key: TuiKeyInput): 
   return { state };
 };
 
-const slashCommandAction = (state: TuiState, prompt: string): TuiUserAction | undefined => {
-  const command = prompt.trim();
-  if (command === "/history") return { type: "audit.history.load" };
+const slashCommandAction = (state: TuiState, intent: InputIntent): TuiUserAction | undefined => {
+  if (intent.kind !== "command") return undefined;
+  if (intent.name === "history") return { type: "audit.history.load" };
 
-  const auditMatch = /^\/audit\s+(.+)$/i.exec(command);
-  if (!auditMatch) return undefined;
+  if (intent.name !== "audit" || !intent.args[0]) return undefined;
 
-  const selector = auditMatch[1].trim();
+  const selector = intent.args.join(" ").trim();
   if (/^[1-9]$/.test(selector)) {
     const run = state.status.auditHistory?.runs[Number(selector) - 1];
     return run ? { type: "audit.run.open", runId: run.runId } : undefined;
@@ -91,21 +92,18 @@ const slashCommandAction = (state: TuiState, prompt: string): TuiUserAction | un
   return { type: "audit.run.open", runId: selector };
 };
 
-const localSlashCommandState = (state: TuiState, prompt: string): TuiState | undefined => {
-  const command = prompt.trim();
-  if (command === "/provider") {
+const localSlashCommandState = (state: TuiState, intent: InputIntent): TuiState | undefined => {
+  if (intent.kind !== "command") return undefined;
+  if (intent.name === "provider") {
     return reduceTuiEvent(state, {
       type: "thinking.delta",
       text: `Provider: ${state.status.provider}; Model: ${state.status.model ?? "default"}`,
     });
   }
-  if (command.startsWith("/")) {
-    return reduceTuiEvent(state, {
-      type: "runtime.error",
-      message: `Unknown command: ${command}. Available commands: /provider, /history, /audit <n>.`,
-    });
-  }
-  return undefined;
+  return reduceTuiEvent(state, {
+    type: "runtime.error",
+    error: createUnknownCommandError(intent.raw),
+  });
 };
 
 const actionFeedbackText = (action: TuiUserAction): string => {
@@ -148,9 +146,10 @@ export const reduceTuiKeyInput = (
     const prompt = state.input.draft.trim();
     if (!prompt) return { state };
     const next = reduceTuiEvent(state, { type: "input.submitted" });
-    const action = slashCommandAction(state, prompt);
+    const intent = parseInput(prompt);
+    const action = slashCommandAction(state, intent);
     if (action) return { state: withActionFeedback(next, action), action };
-    const localState = localSlashCommandState(next, prompt);
+    const localState = localSlashCommandState(next, intent);
     if (localState) return { state: localState };
     const submitAction: TuiUserAction = { type: "submit.prompt", prompt };
     return { state: withActionFeedback(next, submitAction), action: submitAction };

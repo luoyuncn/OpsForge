@@ -1,5 +1,6 @@
 import type { RuntimeEvent } from "@opsforge/pi-runtime";
 import type { TuiEvent } from "./state";
+import { createRuntimeError } from "./domain/errors";
 
 export const runtimeEventToTuiEvent = (event: RuntimeEvent): TuiEvent | undefined => {
   switch (event.type) {
@@ -14,7 +15,7 @@ export const runtimeEventToTuiEvent = (event: RuntimeEvent): TuiEvent | undefine
     case "runtime.rollback.requested":
       return { type: "rollback.requested", rollbackPrompt: event.rollbackPrompt };
     case "runtime.error":
-      return { type: "runtime.error", message: event.message };
+      return { type: "runtime.error", error: createRuntimeError(event.message, event.recoverable) };
     case "runtime.session.started":
       return undefined;
   }

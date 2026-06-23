@@ -12,6 +12,7 @@ import {
   type RollbackPromptInput,
 } from "./prompts";
 import { createExecutionTimeline, formatExecutionTimelineSnapshot } from "./timeline";
+import { createRuntimeError, type TuiStructuredError } from "./domain/errors";
 import type { TuiStatus } from "./index";
 
 export interface TuiInputState {
@@ -36,7 +37,8 @@ export interface TuiState {
 
 export type TuiEvent =
   | { type: "thinking.delta"; text: string }
-  | { type: "runtime.error"; message: string }
+  | { type: "runtime.error"; message: string; error?: never }
+  | { type: "runtime.error"; error: TuiStructuredError; message?: never }
   | { type: "input.changed"; draft: string }
   | { type: "input.submitted" }
   | { type: "plan.ready"; plan: Plan }
@@ -67,15 +69,17 @@ export const reduceTuiEvent = (state: TuiState, event: TuiEvent): TuiState => {
       return {
         ...state,
         thinking: { text },
-        status: { ...state.status, thinkingText: text, errorText: undefined },
+        status: { ...state.status, thinkingText: text, errorText: undefined, error: undefined },
       };
     }
-    case "runtime.error":
+    case "runtime.error": {
+      const error = event.error ?? createRuntimeError(event.message);
       return {
         ...state,
         thinking: { text: "" },
-        status: { ...state.status, thinkingText: undefined, errorText: event.message },
+        status: { ...state.status, thinkingText: undefined, errorText: error.summary, error },
       };
+    }
     case "input.changed":
       return {
         ...state,
@@ -94,6 +98,7 @@ export const reduceTuiEvent = (state: TuiState, event: TuiEvent): TuiState => {
           lastSubmittedPrompt: submitted,
           thinkingText: undefined,
           errorText: undefined,
+          error: undefined,
         },
       };
     }

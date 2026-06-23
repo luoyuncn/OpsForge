@@ -126,7 +126,14 @@ describe("createTuiRuntimeActionHandler", () => {
     expect(events).toEqual([
       {
         type: "runtime.error",
-        message: "Provider returned invalid OpsForge Plan DSL. Try a concrete local-ops task, or switch models/provider.",
+        error: {
+          phase: "validate",
+          type: "INVALID_SCHEMA",
+          summary: "Provider returned invalid OpsForge Plan DSL.",
+          details: ["Required; Invalid discriminator value. Expected 'os-detect'"],
+          retryable: true,
+          suggestedAction: "Try a concrete local-ops task, or switch models/provider.",
+        },
       },
     ]);
   });
