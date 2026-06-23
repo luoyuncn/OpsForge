@@ -34,6 +34,7 @@ describe("buildDoctorReport", () => {
       "provider is not configured",
       "no supported package manager detected",
       "current process is not elevated",
+      "privileged operations will be blocked until OpsForge is started from an elevated shell",
     ]);
   });
 });

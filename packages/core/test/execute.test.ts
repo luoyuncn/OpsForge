@@ -30,6 +30,11 @@ const executor: Executor = {
   },
 };
 
+const elevatedCommandExecutor: Executor = {
+  ...executor,
+  compile: (step) => ({ shell: "bash", argv: ["echo", step.type], needsElevation: true, describe: `Compile ${step.type}` }),
+};
+
 const basePlan: Plan = {
   id: "plan_1",
   title: "Install nginx",
@@ -121,6 +126,49 @@ describe("executePlan", () => {
       "run.step.finished",
       "run.verified",
     ]);
+  });
+
+  it("denies non-dry-run execution when compiled commands need elevation on a non-elevated host", async () => {
+    let runnerCalls = 0;
+    const result = await executePlan({
+      plan: basePlan,
+      executor: elevatedCommandExecutor,
+      facts,
+      audit: createMemoryAuditRecorder(),
+      dryRun: false,
+      yes: true,
+      riskMax: "L3",
+      allowShell: false,
+      runner: async () => {
+        runnerCalls += 1;
+        return { stdout: "", stderr: "", exitCode: 0 };
+      },
+      verifyDeps: {},
+    });
+
+    expect(result.gate.allowed).toBe(false);
+    expect(result.gate.reason).toContain("requires elevated privileges");
+    expect(result.stepResults).toEqual([]);
+    expect(runnerCalls).toBe(0);
+  });
+
+  it("allows dry-run previews for commands that would need elevation", async () => {
+    const result = await executePlan({
+      plan: basePlan,
+      executor: elevatedCommandExecutor,
+      facts,
+      audit: createMemoryAuditRecorder(),
+      dryRun: true,
+      yes: false,
+      riskMax: "L3",
+      allowShell: false,
+      runner: async () => ({ stdout: "", stderr: "", exitCode: 0 }),
+      verifyDeps: {},
+    });
+
+    expect(result.gate.allowed).toBe(true);
+    expect(result.commands[0].needsElevation).toBe(true);
+    expect(result.stepResults).toEqual([]);
   });
 
   it("recommends manual rollback when verification fails and auto rollback is disabled", async () => {

@@ -38,6 +38,7 @@ Implemented plans:
 - Plan 24: `docs/superpowers/plans/2026-06-23-opsforge-plan-24-safe-file-write-template.md`
 - Plan 25: `docs/superpowers/plans/2026-06-23-opsforge-plan-25-skill-templates.md`
 - Plan 26: `docs/superpowers/plans/2026-06-23-opsforge-plan-26-tui-audit-rollback.md`
+- Plan 27: `docs/superpowers/plans/2026-06-23-opsforge-plan-27-safe-elevation.md`
 
 ## Delivered In Plan 1
 
@@ -354,15 +355,26 @@ Implemented plans:
   - `rollback.run` can use an injected test callback or, by default, load the stored Plan from audit history and call `executeRollbackPlan()`.
   - TUI rollback actions now reuse the same policy, guard, executor, verifier, artifact, and audit path as `opsforge rollback`.
 
+## Delivered In Plan 27
+
+- `@opsforge/core`
+  - Non-dry-run execution is denied before runner calls when a compiled command requires elevation and HostFacts report a non-elevated process.
+  - Dry-run still previews privileged compiled commands for review.
+  - The denial reason tells the user to restart OpsForge from an elevated shell before execution.
+
+- `@opsforge/cli`
+  - `opsforge doctor` now reports that privileged operations will be blocked until OpsForge is started from an elevated shell.
+  - TUI status inherits the same doctor warning source because no-argument launch builds from the doctor report.
+
 ## Design Alignment Check
 
 | Spec Area | Status | Evidence | Notes |
 |---|---:|---|---|
 | §3 DSL | Partial | `packages/dsl`, `schemas/plan.schema.json` | Core schema and Plan JSON Schema export exist. Job/approval/inventory/audit schema artifacts remain. |
 | §4 Core pipeline | Partial | `packages/core/src/execute.ts`, `apps/cli/src/commands/run.ts`, `apps/cli/src/commands/rollback.ts`, `apps/cli/src/commands/verify.ts` | Deterministic spine exists, is reachable from NL via `run`, can manually replay stored verifications, recommends rollback by default on failure, and can auto-run rollback when explicitly requested. |
-| §4.1 Executor abstraction | Partial | `packages/executor-base`, `apps/cli/src/host-facts.ts`, `apps/cli/src/commands/apply.ts` | Interfaces, injectable runner, optional command stdin, deterministic template rendering, and real local HostFacts detection exist. Safe elevation flows remain open. |
+| §4.1 Executor abstraction | Partial | `packages/executor-base`, `apps/cli/src/host-facts.ts`, `apps/cli/src/commands/apply.ts`, `packages/core/src/execute.ts` | Interfaces, injectable runner, optional command stdin, deterministic template rendering, real local HostFacts detection, and non-elevated privileged execution blocking exist. Automatic sudo/UAC relaunch remains open. |
 | §4.2 Linux executor | Partial | `packages/executor-linux` | Compile layer exists for apt/dnf/yum, systemd, and stdin-backed file write/template operations. Atomic backups and richer file permissions remain open. |
-| §4.3 Windows executor | Partial | `packages/executor-windows`, `apps/cli/src/host-facts.ts` | Compile layer exists for winget/choco, services, and stdin-backed file write/template operations. Doctor can detect admin status with `net session`; safe UAC elevation flow remains open. |
+| §4.3 Windows executor | Partial | `packages/executor-windows`, `apps/cli/src/host-facts.ts`, `packages/core/src/execute.ts` | Compile layer exists for winget/choco, services, and stdin-backed file write/template operations. Doctor can detect admin status with `net session`, and core blocks privileged execution when not admin; automatic UAC relaunch remains open. |
 | §5 Policy and guard | Partial | `packages/policy` | Deterministic classifier/gate/guards exist. More rules and config knobs are needed. |
 | §6 Planner/provider layer | Partial | `packages/planner`, `packages/config`, `packages/pi-runtime`, `apps/cli/src/provider.ts`, `apps/cli/src/commands/doctor.ts`, `skills/` | Provider boundary, DSL validation, mock provider, deterministic skill templates, persistent provider config, OpenAI-compatible adapter, Anthropic adapter, Google adapter, provider capability reporting, typed Pi runtime event bridge, and runtime action controller exist. Real Pi SDK sessions, JSON retry/tool-call retry loops, and model discovery remain. |
 | §7.1 TUI mode | Partial | `packages/tui`, `packages/tui/src/plan-card.ts`, `packages/tui/src/timeline.ts`, `packages/tui/src/prompts.ts`, `packages/tui/src/state.ts`, `packages/tui/src/runtime-adapter.ts`, `packages/tui/src/controls.ts`, `packages/pi-runtime/src/actions.ts`, `apps/cli/src/index.ts`, `apps/cli/src/tui-runtime.ts`, `packages/planner/src/skill-templates.ts` | `@opsforge/tui` exists, `opsforge` no-arg enters the TUI path in TTY, a deterministic Plan card can render risk/prechecks/steps/compiled command previews/verifications/rollback preview/explanation, a deterministic execution timeline can render step output/exit codes/verification results/rollback recommendations, inline approval/rollback prompt states can render, a pure event/input reducer can drive those views, runtime events can be adapted into TUI events, keyboard input can emit typed prompt/approval/rollback actions, async TUI action handlers can feed returned events back into state, the no-arg CLI entry now wires prompt submission to provider planning plus guarded core execution and stored-audit rollback execution, and planner skill templates are available through that same prompt path. Real Pi SDK streaming and browseable TUI audit history remain. |
@@ -387,11 +399,12 @@ The implementation priority is now locked back to the design document's product 
 - Plan 24: Add stdin-backed safe file-write and file-template execution semantics.
 - Plan 25: Add deterministic skill templates for common local operations and feed them into the planner/TUI path.
 - Plan 26: Wire TUI rollback actions to stored audit rollback execution.
-- After Plan 26: continue with safe elevation flows and richer audit/export reporting.
+- Plan 27: Block privileged execution on non-elevated hosts and surface actionable doctor guidance.
+- After Plan 27: continue with richer audit/export reporting and optional automatic elevation launchers.
 
 ## Remaining Implementation Estimate
 
-To finish the full Phase 1 MVP described in the design document, the project likely needs roughly 2 more plan-sized slices after Plan 26. The immediate remaining tracks are safe elevation flows and richer audit/export/reporting.
+To finish the full Phase 1 MVP described in the design document, the project likely needs roughly 1 more plan-sized slice after Plan 27. The immediate remaining track is richer audit/export/reporting.
 
 ## Known Gaps
 
@@ -401,7 +414,7 @@ To finish the full Phase 1 MVP described in the design document, the project lik
 - TUI primary entry, deterministic state/rendering, runtime-event adaptation, keyboard action emission, runtime action handling, and no-arg provider/core callback wiring exist.
 - TUI rollback prompt rendering, rollback key actions, and no-arg stored audit rollback execution are wired; browseable audit history inside the TUI remains open.
 - Verification replay is manual only; no scheduled or automatic verification loop exists yet.
-- Default verifier probes and HostFacts detection are basic; package-manager edge cases, distro-specific nuance, and safe elevation flows remain open.
+- Default verifier probes and HostFacts detection are basic; package-manager edge cases, distro-specific nuance, and automatic sudo/UAC relaunch remain open.
 - File write/template steps now execute through stdin-backed commands, but atomic backup/restore snapshots and secret redaction remain open.
 - Rollback reporting is basic and does not yet provide rich rollback views in audit output.
 - Audit retention/export and richer report generation are not implemented.
@@ -409,9 +422,9 @@ To finish the full Phase 1 MVP described in the design document, the project lik
 - Provider capability reporting exists in doctor; live model capability checks are not implemented.
 - Only the Plan JSON Schema artifact is exported; job, approval, inventory, and audit schema artifacts remain.
 - Generated plans are persisted as files, not yet in a first-class plan registry.
-- Safe elevation flows are incomplete; current work detects elevated state but does not request or broker elevation.
+- Safe elevation detection and blocking are implemented; automatic sudo/UAC relaunch is not implemented.
 - Skill templates for install-nginx/install-docker/install-nodejs exist; more templates and real Pi skill ingestion remain open.
 
 ## Next Plan Recommendation
 
-Plan 27 should focus on safe elevation guidance and doctor/readiness checks so privileged operations are clearly blocked or guided before execution.
+Plan 28 should focus on richer audit export/reporting so users can inspect execution, verification, rollback, and artifacts without reading raw SQLite state.

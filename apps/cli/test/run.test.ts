@@ -10,6 +10,11 @@ const facts: HostFacts = {
   packageManagers: ["apt"],
 };
 
+const elevatedFacts: HostFacts = {
+  ...facts,
+  isElevated: true,
+};
+
 const createFakeAuditStore = (): AuditStore & { artifactWrites: Array<{ runId: string; stepIndex: number; stdout: string; stderr: string }> } => {
   const memory = createMemoryAuditRecorder();
   const artifactWrites: Array<{ runId: string; stepIndex: number; stdout: string; stderr: string }> = [];
@@ -125,7 +130,7 @@ describe("buildRunCommand", () => {
       now: () => "2026-06-23T00:00:00Z",
       planId: () => "plan_run_auto_rollback",
       platform: "linux",
-      facts,
+      facts: elevatedFacts,
       auditStore,
       runner: async () => ({ stdout: "", stderr: "", exitCode: 0 }),
     });

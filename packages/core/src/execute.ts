@@ -81,6 +81,16 @@ const compileAndGuard = (input: ExecutePlanInput): { commands: CompiledCommand[]
       return { commands: [], gate: commandDecision };
     }
 
+    if (!input.dryRun && command.needsElevation && !input.facts.isElevated) {
+      return {
+        commands: [],
+        gate: {
+          allowed: false,
+          reason: `command requires elevated privileges: ${command.describe}. Re-run OpsForge from an elevated shell before execution.`,
+        },
+      };
+    }
+
     commands.push(command);
   }
 

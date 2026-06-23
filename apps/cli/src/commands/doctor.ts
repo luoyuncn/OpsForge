@@ -32,7 +32,10 @@ const buildWarnings = (facts: HostFacts, provider: string): string[] => {
   const warnings: string[] = [];
   if (provider === "未配置") warnings.push("provider is not configured");
   if (facts.packageManagers.length === 0) warnings.push("no supported package manager detected");
-  if (!facts.isElevated) warnings.push("current process is not elevated");
+  if (!facts.isElevated) {
+    warnings.push("current process is not elevated");
+    warnings.push("privileged operations will be blocked until OpsForge is started from an elevated shell");
+  }
   return warnings;
 };
 

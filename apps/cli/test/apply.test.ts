@@ -11,6 +11,11 @@ const facts: HostFacts = {
   packageManagers: ["apt"],
 };
 
+const elevatedFacts: HostFacts = {
+  ...facts,
+  isElevated: true,
+};
+
 const installPlan = {
   id: "plan_1",
   title: "Install nginx",
@@ -97,7 +102,7 @@ describe("buildApplyCommand", () => {
     const apply = buildApplyCommand({
       readFile: async () => JSON.stringify(installPlan),
       platform: "linux",
-      facts,
+      facts: elevatedFacts,
       auditStore,
       runner: async () => ({ stdout: "installed", stderr: "note", exitCode: 0 }),
     });
@@ -120,7 +125,7 @@ describe("buildApplyCommand", () => {
           risk: "L2",
         }),
       platform: "linux",
-      facts,
+      facts: elevatedFacts,
       auditStore: createFakeAuditStore(),
       runner: async (command) => {
         seen.push({ argv: command.argv, stdin: command.stdin });
