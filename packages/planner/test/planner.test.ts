@@ -96,6 +96,55 @@ describe("buildPlanFromPrompt", () => {
       }),
     ).rejects.toBeInstanceOf(PlannerValidationError);
   });
+
+  it("retries with validation errors and previous output when first provider output is invalid", async () => {
+    const prompts: string[] = [];
+    const outputs: unknown[] = [
+      { title: "Bad install", intent: "install", steps: [{ type: "unknown" }], risk: "L1" },
+      { title: "Install nginx", intent: "install", steps: [{ type: "package-install", name: "nginx" }], risk: "L1" },
+    ];
+
+    const plan = await buildPlanFromPrompt({
+      prompt: "install nginx",
+      provider: {
+        name: "repairable",
+        buildPlan: async ({ prompt }) => {
+          prompts.push(prompt);
+          return outputs.shift();
+        },
+      },
+      now: () => "2026-06-23T00:00:00Z",
+      planId: () => "plan_repaired",
+    });
+
+    expect(plan.id).toBe("plan_repaired");
+    expect(plan.steps[0]).toEqual({ type: "package-install", name: "nginx" });
+    expect(prompts).toHaveLength(2);
+    expect(prompts[1]).toContain("Repair the previous OpsForge Plan DSL output");
+    expect(prompts[1]).toContain("Invalid discriminator value");
+    expect(prompts[1]).toContain("\"type\":\"unknown\"");
+  });
+
+  it("throws after the configured repair attempt budget is exhausted", async () => {
+    let calls = 0;
+
+    await expect(
+      buildPlanFromPrompt({
+        prompt: "install nginx",
+        provider: {
+          name: "bad",
+          buildPlan: async () => {
+            calls += 1;
+            return { title: "Bad", intent: "install", steps: [{ type: "unknown" }], risk: "L1" };
+          },
+        },
+        maxRepairAttempts: 0,
+        now: () => "2026-06-23T00:00:00Z",
+        planId: () => "plan_bad",
+      }),
+    ).rejects.toBeInstanceOf(PlannerValidationError);
+    expect(calls).toBe(1);
+  });
 });
 
 describe("createOpenAICompatiblePlanProvider", () => {

@@ -33,6 +33,7 @@ OpsForge is now being built plan-by-plan on `main`.
 - Plan 26 TUI audit rollback: `docs/superpowers/plans/2026-06-23-opsforge-plan-26-tui-audit-rollback.md`
 - Plan 27 safe elevation: `docs/superpowers/plans/2026-06-23-opsforge-plan-27-safe-elevation.md`
 - Plan 28 TUI audit reports: `docs/superpowers/plans/2026-06-23-opsforge-plan-28-tui-audit-reports.md`
+- Plan 29 planner repair loop: `docs/superpowers/plans/2026-06-23-opsforge-plan-29-planner-repair-loop.md`
 - Current implementation status and design alignment: `docs/implementation-status.md`
 - Checked-in Plan schema artifact: `schemas/plan.schema.json`
 
