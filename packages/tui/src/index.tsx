@@ -25,6 +25,16 @@ import {
 } from "./timeline";
 
 export {
+  createInitialTuiState,
+  formatTuiStateSnapshot,
+  reduceTuiEvent,
+  type TuiEvent,
+  type TuiInputState,
+  type TuiState,
+  type TuiThinkingState,
+} from "./state";
+
+export {
   createTuiPlanCard,
   formatPlanCardSnapshot,
   type TuiCommandPreview,
@@ -62,6 +72,9 @@ export interface TuiStatus {
   timeline?: TuiExecutionTimeline;
   approvalPrompt?: TuiApprovalPrompt;
   rollbackPrompt?: TuiRollbackPrompt;
+  thinkingText?: string;
+  inputDraft?: string;
+  lastSubmittedPrompt?: string;
 }
 
 export interface TuiLaunchOptions {
@@ -74,6 +87,9 @@ export interface TuiLaunchOptions {
   execution?: ExecutePlanResult;
   approval?: ApprovalPromptInput;
   rollbackPrompt?: RollbackPromptInput;
+  thinkingText?: string;
+  inputDraft?: string;
+  lastSubmittedPrompt?: string;
 }
 
 export const createTuiStatus = (options: TuiLaunchOptions): TuiStatus => ({
@@ -86,6 +102,9 @@ export const createTuiStatus = (options: TuiLaunchOptions): TuiStatus => ({
   timeline: options.execution ? createExecutionTimeline(options.execution) : undefined,
   approvalPrompt: options.approval ? createApprovalPrompt(options.approval) : undefined,
   rollbackPrompt: options.rollbackPrompt ? createRollbackPrompt(options.rollbackPrompt) : undefined,
+  thinkingText: options.thinkingText,
+  inputDraft: options.inputDraft,
+  lastSubmittedPrompt: options.lastSubmittedPrompt,
 });
 
 const formatDistro = (facts: HostFacts): string => {
@@ -107,11 +126,13 @@ export const formatTuiSnapshot = (status: TuiStatus): string => [
   `Model: ${status.model ?? "default"}`,
   `Session: ${status.sessionLabel}`,
   `Audit: ${status.auditLabel}`,
+  status.thinkingText ? `Thinking: ${status.thinkingText}` : undefined,
+  status.lastSubmittedPrompt ? `Last prompt: ${status.lastSubmittedPrompt}` : undefined,
   status.planCard ? formatPlanCardSnapshot(status.planCard) : "Timeline: waiting for a task",
   status.timeline ? formatExecutionTimelineSnapshot(status.timeline) : undefined,
   status.approvalPrompt ? formatApprovalPromptSnapshot(status.approvalPrompt) : undefined,
   status.rollbackPrompt ? formatRollbackPromptSnapshot(status.rollbackPrompt) : undefined,
-  "Ask Forge >",
+  `Ask Forge > ${status.inputDraft ?? ""}`.trimEnd(),
 ].filter((line): line is string => Boolean(line)).join("\n");
 
 export interface TuiAppProps {
@@ -133,6 +154,7 @@ export const TuiApp = ({ status }: TuiAppProps): React.ReactElement => (
       <Text>Model: {status.model ?? "default"}</Text>
     </Box>
     <Box marginTop={1} flexDirection="column">
+      {status.thinkingText ? <Text>Thinking: {status.thinkingText}</Text> : null}
       {status.planCard ? <PlanCardView card={status.planCard} /> : (
         <>
           <Text color="gray">Timeline: waiting for a task</Text>
@@ -144,7 +166,8 @@ export const TuiApp = ({ status }: TuiAppProps): React.ReactElement => (
       {status.rollbackPrompt ? <RollbackPromptView prompt={status.rollbackPrompt} /> : null}
     </Box>
     <Box marginTop={1}>
-      <Text color="green">Ask Forge &gt; </Text>
+      {status.lastSubmittedPrompt ? <Text color="gray">Last prompt: {status.lastSubmittedPrompt} </Text> : null}
+      <Text color="green">Ask Forge &gt; {status.inputDraft ?? ""}</Text>
     </Box>
     <Box marginTop={1}>
       <Text color="gray">Session: {status.sessionLabel} | Audit: {status.auditLabel}</Text>

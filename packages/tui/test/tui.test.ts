@@ -5,6 +5,7 @@ import type { HostFacts } from "@opsforge/executor-base";
 import {
   createApprovalPrompt,
   createExecutionTimeline,
+  createInitialTuiState,
   createRollbackPrompt,
   createTuiPlanCard,
   createTuiStatus,
@@ -12,7 +13,9 @@ import {
   formatExecutionTimelineSnapshot,
   formatPlanCardSnapshot,
   formatRollbackPromptSnapshot,
+  formatTuiStateSnapshot,
   formatTuiSnapshot,
+  reduceTuiEvent,
 } from "../src/index";
 
 const linuxFacts: HostFacts = {
@@ -195,6 +198,20 @@ describe("formatTuiSnapshot", () => {
     expect(snapshot).toContain("Reason: required");
     expect(snapshot).toContain("Rollback prompt: recommended");
     expect(snapshot).toContain("opsforge rollback run_plan_nginx");
+  });
+
+  it("renders thinking and input state inside the TUI snapshot", () => {
+    const snapshot = formatTuiSnapshot(createTuiStatus({
+      facts: linuxFacts,
+      provider: "mock",
+      thinkingText: "Forge is building a safe plan.",
+      inputDraft: "install nginx",
+      lastSubmittedPrompt: "diagnose nginx",
+    }));
+
+    expect(snapshot).toContain("Thinking: Forge is building a safe plan.");
+    expect(snapshot).toContain("Last prompt: diagnose nginx");
+    expect(snapshot).toContain("Ask Forge > install nginx");
   });
 });
 
@@ -388,5 +405,76 @@ describe("formatRollbackPromptSnapshot", () => {
     expect(snapshot).toContain("Rollback prompt: recommended");
     expect(snapshot).toContain("Actions: rollback, skip");
     expect(snapshot).toContain("opsforge rollback run_plan_nginx");
+  });
+});
+
+describe("reduceTuiEvent", () => {
+  it("accumulates thinking stream text without mutating the previous state", () => {
+    const state = createInitialTuiState(createTuiStatus({ facts: linuxFacts, provider: "mock" }));
+    const next = reduceTuiEvent(state, { type: "thinking.delta", text: "Checking " });
+    const final = reduceTuiEvent(next, { type: "thinking.delta", text: "host facts." });
+
+    expect(next).not.toBe(state);
+    expect(state.status.thinkingText).toBeUndefined();
+    expect(final.status.thinkingText).toBe("Checking host facts.");
+  });
+
+  it("tracks input draft and clears it after submit", () => {
+    const state = createInitialTuiState(createTuiStatus({ facts: linuxFacts, provider: "mock" }));
+    const drafted = reduceTuiEvent(state, { type: "input.changed", draft: "install nginx" });
+    const submitted = reduceTuiEvent(drafted, { type: "input.submitted" });
+
+    expect(drafted.input.draft).toBe("install nginx");
+    expect(submitted.input.draft).toBe("");
+    expect(submitted.input.lastSubmitted).toBe("install nginx");
+    expect(submitted.status.lastSubmittedPrompt).toBe("install nginx");
+  });
+
+  it("builds renderable plan, execution, approval, and rollback state from events", () => {
+    let state = createInitialTuiState(createTuiStatus({ facts: linuxFacts, provider: "mock" }));
+    state = reduceTuiEvent(state, { type: "plan.ready", plan: nginxPlan });
+    state = reduceTuiEvent(state, { type: "execution.finished", result: nginxExecutionResult });
+    state = reduceTuiEvent(state, {
+      type: "approval.requested",
+      approval: {
+        planId: "plan_nginx",
+        title: "Install nginx",
+        risk: "L2",
+        interactive: true,
+      },
+    });
+    state = reduceTuiEvent(state, {
+      type: "rollback.requested",
+      rollbackPrompt: {
+        runId: "run_plan_nginx",
+        rollback: {
+          trigger: "step-failed",
+          autoExecuted: false,
+          available: true,
+          reason: "rollback recommended after step-failed",
+          suggestedCommand: "opsforge rollback run_plan_nginx",
+        },
+      },
+    });
+
+    expect(state.status.planCard?.title).toBe("Install nginx");
+    expect(state.status.timeline?.runId).toBe("run_plan_nginx");
+    expect(state.status.approvalPrompt?.status).toBe("required");
+    expect(state.status.rollbackPrompt?.status).toBe("recommended");
+  });
+});
+
+describe("formatTuiStateSnapshot", () => {
+  it("renders an event-driven TUI state snapshot", () => {
+    let state = createInitialTuiState(createTuiStatus({ facts: linuxFacts, provider: "mock" }));
+    state = reduceTuiEvent(state, { type: "thinking.delta", text: "Planning safely." });
+    state = reduceTuiEvent(state, { type: "input.changed", draft: "install nginx" });
+    state = reduceTuiEvent(state, { type: "plan.ready", plan: nginxPlan });
+
+    const snapshot = formatTuiStateSnapshot(state);
+
+    expect(snapshot).toContain("Thinking: Planning safely.");
+    expect(snapshot).toContain("Ask Forge > install nginx");
+    expect(snapshot).toContain("Plan: Install nginx");
   });
 });
