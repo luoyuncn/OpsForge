@@ -23,6 +23,7 @@
     "@opsforge/executor-linux": "workspace:*",
     "@opsforge/executor-windows": "workspace:*",
     "@opsforge/planner": "workspace:^",
+    "@opsforge/tui": "workspace:*",
     "commander": "^12.1.0"
   },
   "devDependencies": {

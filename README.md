@@ -18,6 +18,7 @@ OpsForge is now being built plan-by-plan on `main`.
 - Plan 11 verifier coverage: `docs/superpowers/plans/2026-06-23-opsforge-plan-11-verifier-coverage.md`
 - Plan 12 default verifier probes: `docs/superpowers/plans/2026-06-23-opsforge-plan-12-default-verifier-probes.md`
 - Plan 13 host facts and doctor: `docs/superpowers/plans/2026-06-23-opsforge-plan-13-host-facts-doctor.md`
+- Plan 14 TUI foundation: `docs/superpowers/plans/2026-06-23-opsforge-plan-14-tui-foundation.md`
 - Current implementation status and design alignment: `docs/implementation-status.md`
 - Checked-in Plan schema artifact: `schemas/plan.schema.json`
 
@@ -27,6 +28,7 @@ Useful commands:
 pnpm build
 pnpm test
 pnpm typecheck
+node apps/cli/dist/index.js
 node apps/cli/dist/index.js doctor
 node apps/cli/dist/index.js plan "install nginx"
 node apps/cli/dist/index.js plan "install nginx" --json
