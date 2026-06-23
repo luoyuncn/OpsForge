@@ -1,7 +1,8 @@
 import { execFile } from "node:child_process";
 import { readFile as readFileFromDisk } from "node:fs/promises";
 import { promisify } from "node:util";
-import { createMemoryAuditRecorder } from "@opsforge/audit";
+import { createSqliteAuditStore, resolveOpsForgePaths, type AuditStore } from "@opsforge/audit";
+import { loadConfig, type OpsForgeConfig } from "@opsforge/config";
 import { executePlan, type ExecutePlanResult } from "@opsforge/core";
 import { parsePlan, type RiskLevel } from "@opsforge/dsl";
 import type { CommandRunner, HostFacts, RawCommandResult } from "@opsforge/executor-base";
@@ -26,6 +27,8 @@ export interface BuildApplyDeps {
   facts?: HostFacts;
   which?: WhichRunner;
   runner?: CommandRunner;
+  auditStore?: AuditStore;
+  config?: OpsForgeConfig;
 }
 
 export type ApplyResult = ExecutePlanResult & {
@@ -74,21 +77,31 @@ export const buildApplyCommand = (deps: BuildApplyDeps = {}) => async (
   const plan = parsePlan(JSON.parse(input));
   const hostOs = detectOs(deps.platform ?? process.platform);
   const facts = deps.facts ?? factsFromHost(plan.osFamily ?? hostOs, deps.which ?? systemWhich);
-  const audit = createMemoryAuditRecorder();
-  const result = await executePlan({
-    plan,
-    executor: executorForFacts(facts),
-    facts,
-    audit,
-    dryRun: options.dryRun,
-    yes: options.yes,
-    riskMax: options.riskMax,
-    allowShell: options.allowShell,
-    runner: deps.runner ?? defaultRunner,
-    verifyDeps: {},
-  });
+  const createdAuditStore = deps.auditStore === undefined;
+  const audit = deps.auditStore ?? createSqliteAuditStore(resolveOpsForgePaths(deps.config ?? loadConfig()));
 
-  return { ...result, dryRun: options.dryRun };
+  try {
+    const result = await executePlan({
+      plan,
+      executor: executorForFacts(facts),
+      facts,
+      audit,
+      dryRun: options.dryRun,
+      yes: options.yes,
+      riskMax: options.riskMax,
+      allowShell: options.allowShell,
+      runner: deps.runner ?? defaultRunner,
+      verifyDeps: {},
+    });
+
+    for (const [index, stepResult] of result.stepResults.entries()) {
+      audit.recordStepArtifacts(result.runId, index, stepResult.stdout, stepResult.stderr);
+    }
+
+    return { ...result, dryRun: options.dryRun };
+  } finally {
+    if (createdAuditStore) audit.close();
+  }
 };
 
 export const formatApplyResult = (result: ApplyResult): string => {

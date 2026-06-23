@@ -1,12 +1,10 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
-import type { DatabaseSync as DatabaseSyncType } from "node:sqlite";
 import type { AuditEvent, AuditRecorder } from "./events";
 import type { AuditRunDetail, AuditRunSummary, AuditStepRun } from "./summary";
 
 const require = createRequire(import.meta.url);
-const { DatabaseSync } = require("node:sqlite") as { DatabaseSync: typeof DatabaseSyncType };
 
 export interface CreateSqliteAuditStoreOptions {
   dbPath: string;
@@ -46,6 +44,20 @@ interface StepRow {
   stdout_path: string | null;
   stderr_path: string | null;
 }
+
+interface SqliteStatement {
+  run(...values: unknown[]): unknown;
+  get(...values: unknown[]): unknown;
+  all(...values: unknown[]): unknown[];
+}
+
+interface SqliteDatabase {
+  exec(sql: string): void;
+  prepare(sql: string): SqliteStatement;
+  close(): void;
+}
+
+type DatabaseSyncConstructor = new (path: string) => SqliteDatabase;
 
 const schema = `
 CREATE TABLE IF NOT EXISTS plans (
@@ -123,6 +135,7 @@ export const createSqliteAuditStore = (options: CreateSqliteAuditStoreOptions): 
   mkdirSync(dirname(options.dbPath), { recursive: true });
   mkdirSync(options.artifactsDir, { recursive: true });
 
+  const { DatabaseSync } = require("node:sqlite") as { DatabaseSync: DatabaseSyncConstructor };
   const db = new DatabaseSync(options.dbPath);
   db.exec(schema);
 
