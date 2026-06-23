@@ -817,4 +817,25 @@ describe("reduceTuiKeyInput", () => {
     state = reduceTuiKeyInput(state, "/audit 1", {}).state;
     expect(reduceTuiKeyInput(state, "", { return: true }).action).toEqual({ type: "audit.run.open", runId: "run_1" });
   });
+
+  it("handles local slash commands without sending them to the provider", () => {
+    let state = createInitialTuiState(createTuiStatus({
+      facts: linuxFacts,
+      provider: "openai-compatible (gpt-5.5)",
+      model: "gpt-5.5",
+    }));
+
+    state = reduceTuiKeyInput(state, "/provider", {}).state;
+    const providerResult = reduceTuiKeyInput(state, "", { return: true });
+
+    expect(providerResult.action).toBeUndefined();
+    expect(providerResult.state.status.lastSubmittedPrompt).toBe("/provider");
+    expect(providerResult.state.status.thinkingText).toBe("Provider: openai-compatible (gpt-5.5); Model: gpt-5.5");
+
+    state = reduceTuiKeyInput(providerResult.state, "/unknown", {}).state;
+    const unknownResult = reduceTuiKeyInput(state, "", { return: true });
+
+    expect(unknownResult.action).toBeUndefined();
+    expect(unknownResult.state.status.errorText).toBe("Unknown command: /unknown. Available commands: /provider, /history, /audit <n>.");
+  });
 });

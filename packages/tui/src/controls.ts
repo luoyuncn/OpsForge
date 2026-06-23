@@ -91,6 +91,23 @@ const slashCommandAction = (state: TuiState, prompt: string): TuiUserAction | un
   return { type: "audit.run.open", runId: selector };
 };
 
+const localSlashCommandState = (state: TuiState, prompt: string): TuiState | undefined => {
+  const command = prompt.trim();
+  if (command === "/provider") {
+    return reduceTuiEvent(state, {
+      type: "thinking.delta",
+      text: `Provider: ${state.status.provider}; Model: ${state.status.model ?? "default"}`,
+    });
+  }
+  if (command.startsWith("/")) {
+    return reduceTuiEvent(state, {
+      type: "runtime.error",
+      message: `Unknown command: ${command}. Available commands: /provider, /history, /audit <n>.`,
+    });
+  }
+  return undefined;
+};
+
 const actionFeedbackText = (action: TuiUserAction): string => {
   switch (action.type) {
     case "submit.prompt":
@@ -133,6 +150,8 @@ export const reduceTuiKeyInput = (
     const next = reduceTuiEvent(state, { type: "input.submitted" });
     const action = slashCommandAction(state, prompt);
     if (action) return { state: withActionFeedback(next, action), action };
+    const localState = localSlashCommandState(next, prompt);
+    if (localState) return { state: localState };
     const submitAction: TuiUserAction = { type: "submit.prompt", prompt };
     return { state: withActionFeedback(next, submitAction), action: submitAction };
   }
