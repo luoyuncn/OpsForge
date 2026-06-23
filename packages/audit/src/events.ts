@@ -1,7 +1,7 @@
 import type { Plan, RiskLevel, Step } from "@opsforge/dsl";
 
 export type AuditEvent =
-  | { type: "plan.created"; at: string; payload: { planId: string; intent: Plan["intent"]; risk: RiskLevel } }
+  | { type: "plan.created"; at: string; payload: { planId: string; intent: Plan["intent"]; risk: RiskLevel; plan?: Plan } }
   | { type: "plan.classified"; at: string; payload: { planId: string; risk: RiskLevel } }
   | { type: "gate.confirmed"; at: string; payload: { planId: string; risk: RiskLevel; reason?: string } }
   | { type: "job.dispatched"; at: string; payload: { runId: string; planId: string } }

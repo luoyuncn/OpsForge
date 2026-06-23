@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { Plan } from "@opsforge/dsl";
 import { createSqliteAuditStore, resolveOpsForgePaths } from "../src/index";
 
 const require = createRequire(import.meta.url);
@@ -23,6 +24,35 @@ afterEach(async () => {
 });
 
 describe("createSqliteAuditStore", () => {
+  it("persists the full plan for a run so rollback can load it later", () => {
+    const store = createSqliteAuditStore({ dbPath: join(dir, "opsforge.db"), artifactsDir: join(dir, "artifacts") });
+    const plan: Plan = {
+      id: "p1",
+      title: "Install nginx",
+      intent: "install",
+      risk: "L1",
+      createdAt: "2026-06-23T00:00:00Z",
+      prechecks: [],
+      steps: [{ type: "package-install", name: "nginx" }],
+      verifications: [],
+      rollback: [{ type: "package-remove", name: "nginx" }],
+      explanation: [],
+    };
+
+    try {
+      store.record({
+        type: "plan.created",
+        at: "2026-06-23T00:00:00Z",
+        payload: { planId: "p1", intent: "install", risk: "L1", plan },
+      });
+      store.record({ type: "job.dispatched", at: "2026-06-23T00:00:01Z", payload: { runId: "r1", planId: "p1" } });
+
+      expect(store.showRun("r1")?.plan).toEqual(plan);
+    } finally {
+      store.close();
+    }
+  });
+
   it("persists plans, runs, step runs, and events", () => {
     const store = createSqliteAuditStore({ dbPath: join(dir, "opsforge.db"), artifactsDir: join(dir, "artifacts") });
     store.record({ type: "plan.created", at: "2026-06-23T00:00:00Z", payload: { planId: "p1", intent: "install", risk: "L1" } });

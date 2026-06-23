@@ -1,4 +1,5 @@
 import type { AuditEvent } from "./events";
+import type { Plan } from "@opsforge/dsl";
 
 export interface AuditRunSummary {
   runId: string;
@@ -19,6 +20,7 @@ export interface AuditStepRun {
 }
 
 export interface AuditRunDetail extends AuditRunSummary {
+  plan?: Plan;
   events: AuditEvent[];
   steps: AuditStepRun[];
 }

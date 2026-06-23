@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
+import type { Plan } from "@opsforge/dsl";
 import type { AuditEvent, AuditRecorder } from "./events";
 import type { AuditRunDetail, AuditRunSummary, AuditStepRun } from "./summary";
 
@@ -25,6 +26,7 @@ interface RunRow {
   run_id: string;
   plan_id: string;
   risk: string | null;
+  plan_json: string | null;
   status: string;
   started_at: string;
   ended_at: string | null;
@@ -64,7 +66,8 @@ CREATE TABLE IF NOT EXISTS plans (
   plan_id TEXT PRIMARY KEY,
   intent TEXT NOT NULL,
   risk TEXT NOT NULL,
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  plan_json TEXT
 );
 
 CREATE TABLE IF NOT EXISTS runs (
@@ -96,6 +99,8 @@ CREATE TABLE IF NOT EXISTS audit_events (
 );
 `;
 
+const addPlanJsonMigration = "ALTER TABLE plans ADD COLUMN plan_json TEXT";
+
 const eventPlanId = (event: AuditEvent): string | undefined => {
   if ("planId" in event.payload) return event.payload.planId;
   return undefined;
@@ -124,6 +129,11 @@ const toRunSummary = (row: RunRow): AuditRunSummary => ({
   stepCount: row.step_count,
 });
 
+const parseStoredPlan = (value: string | null): Plan | undefined => {
+  if (value === null) return undefined;
+  return JSON.parse(value) as Plan;
+};
+
 const toStepRun = (row: StepRow): AuditStepRun => ({
   stepIndex: row.step_index,
   step: row.step_json === null ? undefined : JSON.parse(row.step_json),
@@ -139,12 +149,18 @@ export const createSqliteAuditStore = (options: CreateSqliteAuditStoreOptions): 
   const { DatabaseSync } = require("node:sqlite") as { DatabaseSync: DatabaseSyncConstructor };
   const db = new DatabaseSync(options.dbPath);
   db.exec(schema);
+  try {
+    db.exec(addPlanJsonMigration);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.toLowerCase().includes("duplicate column")) throw error;
+  }
 
   const insertEvent = db.prepare(
     "INSERT INTO audit_events (run_id, plan_id, type, at, payload_json) VALUES (?, ?, ?, ?, ?)",
   );
   const insertPlan = db.prepare(
-    "INSERT OR REPLACE INTO plans (plan_id, intent, risk, created_at) VALUES (?, ?, ?, ?)",
+    "INSERT OR REPLACE INTO plans (plan_id, intent, risk, created_at, plan_json) VALUES (?, ?, ?, ?, ?)",
   );
   const insertRun = db.prepare(
     "INSERT OR REPLACE INTO runs (run_id, plan_id, status, started_at, ended_at) VALUES (?, ?, ?, ?, ?)",
@@ -190,7 +206,13 @@ export const createSqliteAuditStore = (options: CreateSqliteAuditStoreOptions): 
       recorded.push(event);
 
       if (event.type === "plan.created") {
-        insertPlan.run(event.payload.planId, event.payload.intent, event.payload.risk, event.at);
+        insertPlan.run(
+          event.payload.planId,
+          event.payload.intent,
+          event.payload.risk,
+          event.at,
+          event.payload.plan ? JSON.stringify(event.payload.plan) : null,
+        );
       }
 
       if (event.type === "job.dispatched") {
@@ -222,7 +244,7 @@ export const createSqliteAuditStore = (options: CreateSqliteAuditStoreOptions): 
     listRuns: () => {
       assertOpen();
       return (db.prepare(
-        `SELECT runs.run_id, runs.plan_id, plans.risk, runs.status, runs.started_at, runs.ended_at,
+        `SELECT runs.run_id, runs.plan_id, plans.risk, NULL AS plan_json, runs.status, runs.started_at, runs.ended_at,
                 COUNT(step_runs.id) AS step_count
          FROM runs
          LEFT JOIN plans ON plans.plan_id = runs.plan_id
@@ -234,7 +256,7 @@ export const createSqliteAuditStore = (options: CreateSqliteAuditStoreOptions): 
     showRun: (runId) => {
       assertOpen();
       const row = db.prepare(
-        `SELECT runs.run_id, runs.plan_id, plans.risk, runs.status, runs.started_at, runs.ended_at,
+        `SELECT runs.run_id, runs.plan_id, plans.risk, plans.plan_json, runs.status, runs.started_at, runs.ended_at,
                 COUNT(step_runs.id) AS step_count
          FROM runs
          LEFT JOIN plans ON plans.plan_id = runs.plan_id
@@ -258,7 +280,7 @@ export const createSqliteAuditStore = (options: CreateSqliteAuditStoreOptions): 
          ORDER BY step_index`,
       ).all(runId) as unknown as StepRow[]).map(toStepRun);
 
-      return { ...toRunSummary(row), events, steps };
+      return { ...toRunSummary(row), plan: parseStoredPlan(row.plan_json), events, steps };
     },
     recordStepArtifacts: (runId, stepIndex, stdout, stderr) => {
       assertOpen();
