@@ -1,8 +1,14 @@
 import React from "react";
 import { Box, Text, render, useInput } from "ink";
+import type { AuditRunReport } from "@opsforge/audit";
 import type { ExecutePlanResult } from "@opsforge/core";
 import type { Plan } from "@opsforge/dsl";
 import type { HostFacts } from "@opsforge/executor-base";
+import {
+  formatAuditDetailSnapshot,
+  formatAuditHistorySnapshot,
+  type TuiAuditHistory,
+} from "./audit-history";
 import {
   createTuiPlanCard,
   formatPlanCardSnapshot,
@@ -32,6 +38,12 @@ export {
   type TuiKeyInputResult,
   type TuiUserAction,
 } from "./controls";
+
+export {
+  formatAuditDetailSnapshot,
+  formatAuditHistorySnapshot,
+  type TuiAuditHistory,
+} from "./audit-history";
 
 export {
   createInitialTuiState,
@@ -87,6 +99,8 @@ export interface TuiStatus {
   timeline?: TuiExecutionTimeline;
   approvalPrompt?: TuiApprovalPrompt;
   rollbackPrompt?: TuiRollbackPrompt;
+  auditHistory?: TuiAuditHistory;
+  auditDetail?: AuditRunReport;
   thinkingText?: string;
   inputDraft?: string;
   lastSubmittedPrompt?: string;
@@ -102,6 +116,8 @@ export interface TuiLaunchOptions {
   execution?: ExecutePlanResult;
   approval?: ApprovalPromptInput;
   rollbackPrompt?: RollbackPromptInput;
+  auditHistory?: TuiAuditHistory;
+  auditDetail?: AuditRunReport;
   thinkingText?: string;
   inputDraft?: string;
   lastSubmittedPrompt?: string;
@@ -117,6 +133,8 @@ export const createTuiStatus = (options: TuiLaunchOptions): TuiStatus => ({
   timeline: options.execution ? createExecutionTimeline(options.execution) : undefined,
   approvalPrompt: options.approval ? createApprovalPrompt(options.approval) : undefined,
   rollbackPrompt: options.rollbackPrompt ? createRollbackPrompt(options.rollbackPrompt) : undefined,
+  auditHistory: options.auditHistory,
+  auditDetail: options.auditDetail,
   thinkingText: options.thinkingText,
   inputDraft: options.inputDraft,
   lastSubmittedPrompt: options.lastSubmittedPrompt,
@@ -147,6 +165,8 @@ export const formatTuiSnapshot = (status: TuiStatus): string => [
   status.timeline ? formatExecutionTimelineSnapshot(status.timeline) : undefined,
   status.approvalPrompt ? formatApprovalPromptSnapshot(status.approvalPrompt) : undefined,
   status.rollbackPrompt ? formatRollbackPromptSnapshot(status.rollbackPrompt) : undefined,
+  status.auditHistory ? formatAuditHistorySnapshot(status.auditHistory) : undefined,
+  status.auditDetail ? formatAuditDetailSnapshot(status.auditDetail) : undefined,
   `Ask Forge > ${status.inputDraft ?? ""}`.trimEnd(),
 ].filter((line): line is string => Boolean(line)).join("\n");
 
@@ -179,6 +199,8 @@ export const TuiApp = ({ status }: TuiAppProps): React.ReactElement => (
       {status.timeline ? <ExecutionTimelineView timeline={status.timeline} /> : null}
       {status.approvalPrompt ? <ApprovalPromptView prompt={status.approvalPrompt} /> : null}
       {status.rollbackPrompt ? <RollbackPromptView prompt={status.rollbackPrompt} /> : null}
+      {status.auditHistory ? <AuditHistoryView history={status.auditHistory} /> : null}
+      {status.auditDetail ? <AuditDetailView report={status.auditDetail} /> : null}
     </Box>
     <Box marginTop={1}>
       {status.lastSubmittedPrompt ? <Text color="gray">Last prompt: {status.lastSubmittedPrompt} </Text> : null}
@@ -328,6 +350,52 @@ const RollbackPromptView = ({ prompt }: RollbackPromptViewProps): React.ReactEle
     <Text>Reason: {prompt.reason}</Text>
     <Text>Actions: {prompt.actions.length ? prompt.actions.join(", ") : "none"}</Text>
     {prompt.suggestedCommand ? <Text>Command: {prompt.suggestedCommand}</Text> : null}
+  </Box>
+);
+
+interface AuditHistoryViewProps {
+  history: TuiAuditHistory;
+}
+
+const AuditHistoryView = ({ history }: AuditHistoryViewProps): React.ReactElement => (
+  <Box marginTop={1} flexDirection="column">
+    <Text bold>Audit history</Text>
+    {history.runs.length ? history.runs.map((run, index) => (
+      <Text key={run.runId}>
+        {index + 1}. {run.runId} plan={run.planId} risk={run.risk} status={run.status} steps={run.stepCount}
+      </Text>
+    )) : <Text>- none</Text>}
+  </Box>
+);
+
+interface AuditDetailViewProps {
+  report: AuditRunReport;
+}
+
+const AuditDetailView = ({ report }: AuditDetailViewProps): React.ReactElement => (
+  <Box marginTop={1} flexDirection="column">
+    <Text bold>Audit detail: {report.summary.title} ({report.summary.runId})</Text>
+    <Text>Plan: {report.summary.planId}</Text>
+    <Text>Intent: {report.summary.intent}</Text>
+    <Text>Risk: {report.summary.risk}</Text>
+    <Text>Status: {report.summary.status}</Text>
+    <Text>Rollback: {report.rollback.status} available={String(report.rollback.available)}</Text>
+    <Box marginTop={1} flexDirection="column">
+      <Text color="cyan">Steps</Text>
+      {report.steps.length ? report.steps.map((step) => (
+        <Box key={step.stepIndex} flexDirection="column">
+          <Text>{step.stepIndex + 1}. {step.label} exit={step.exitCode ?? "-"}</Text>
+          {step.stdoutPath ? <Text>stdout: {step.stdoutPath}</Text> : null}
+          {step.stderrPath ? <Text>stderr: {step.stderrPath}</Text> : null}
+        </Box>
+      )) : <Text>- none</Text>}
+    </Box>
+    <Box marginTop={1} flexDirection="column">
+      <Text color="cyan">Events</Text>
+      {report.eventTimeline.length ? report.eventTimeline.map((event) => (
+        <Text key={`${event.index}-${event.type}`}>{event.index}. {event.at} {event.type}</Text>
+      )) : <Text>- none</Text>}
+    </Box>
   </Box>
 );
 

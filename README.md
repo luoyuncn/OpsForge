@@ -32,6 +32,7 @@ OpsForge is now being built plan-by-plan on `main`.
 - Plan 25 skill templates: `docs/superpowers/plans/2026-06-23-opsforge-plan-25-skill-templates.md`
 - Plan 26 TUI audit rollback: `docs/superpowers/plans/2026-06-23-opsforge-plan-26-tui-audit-rollback.md`
 - Plan 27 safe elevation: `docs/superpowers/plans/2026-06-23-opsforge-plan-27-safe-elevation.md`
+- Plan 28 TUI audit reports: `docs/superpowers/plans/2026-06-23-opsforge-plan-28-tui-audit-reports.md`
 - Current implementation status and design alignment: `docs/implementation-status.md`
 - Checked-in Plan schema artifact: `schemas/plan.schema.json`
 
@@ -63,6 +64,7 @@ node apps/cli/dist/index.js rollback <run_id> --dry-run
 node apps/cli/dist/index.js rollback <run_id> --dry-run --json
 node apps/cli/dist/index.js audit ls
 node apps/cli/dist/index.js audit show <run_id>
+node apps/cli/dist/index.js audit export <run_id> --out audit-report.json
 ```
 
 OpsForge Agent

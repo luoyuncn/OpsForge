@@ -14,7 +14,9 @@ export type TuiUserAction =
   | { type: "approval.approve"; planId: string; reason?: string }
   | { type: "approval.deny"; planId: string }
   | { type: "rollback.run"; runId: string }
-  | { type: "rollback.skip"; runId: string };
+  | { type: "rollback.skip"; runId: string }
+  | { type: "audit.history.load" }
+  | { type: "audit.run.open"; runId: string };
 
 export interface TuiKeyInputResult {
   state: TuiState;
@@ -74,6 +76,16 @@ const handleApprovalInput = (state: TuiState, input: string, key: TuiKeyInput): 
   return { state };
 };
 
+const handleAuditInput = (state: TuiState, input: string): TuiKeyInputResult | undefined => {
+  if (state.input.draft) return undefined;
+  if (input.toLowerCase() === "h") return { state, action: { type: "audit.history.load" } };
+  if (/^[1-9]$/.test(input)) {
+    const run = state.status.auditHistory?.runs[Number(input) - 1];
+    return run ? { state, action: { type: "audit.run.open", runId: run.runId } } : { state };
+  }
+  return undefined;
+};
+
 export const reduceTuiKeyInput = (
   state: TuiState,
   input: string,
@@ -86,6 +98,9 @@ export const reduceTuiKeyInput = (
 
   const approval = handleApprovalInput(state, input, key);
   if (approval) return approval;
+
+  const audit = handleAuditInput(state, input);
+  if (audit) return audit;
 
   if (key.backspace || key.delete) return { state: removeLastInput(state) };
   if (key.return) {

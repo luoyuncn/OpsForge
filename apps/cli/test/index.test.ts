@@ -182,6 +182,80 @@ describe("createTuiRuntimeActionHandler", () => {
     expect(commands).toEqual(["apt-get remove -y nginx"]);
     expect(events.map((event) => event.type)).toEqual(["thinking.delta", "execution.finished"]);
   });
+
+  it("loads audit history for the TUI from the configured audit store", async () => {
+    const auditStore: AuditStore = {
+      record: () => {},
+      events: () => [],
+      listRuns: () => [
+        {
+          runId: "run_1",
+          planId: "plan_1",
+          risk: "L1",
+          status: "completed",
+          startedAt: "2026-06-23T00:00:00Z",
+          stepCount: 1,
+        },
+      ],
+      showRun: () => undefined,
+      recordStepArtifacts: () => ({ stdoutPath: "stdout.txt", stderrPath: "stderr.txt" }),
+      close: () => {},
+    };
+    const handler = await createTuiRuntimeActionHandler({ facts: linuxFacts, auditStore });
+
+    const events = await handler({ type: "audit.history.load" }) ?? [];
+
+    expect(events).toEqual([
+      {
+        type: "audit.history.loaded",
+        history: {
+          runs: [
+            {
+              runId: "run_1",
+              planId: "plan_1",
+              risk: "L1",
+              status: "completed",
+              startedAt: "2026-06-23T00:00:00Z",
+              stepCount: 1,
+            },
+          ],
+        },
+      },
+    ]);
+  });
+
+  it("opens audit run reports for the TUI from the configured audit store", async () => {
+    const auditStore: AuditStore = {
+      record: () => {},
+      events: () => [],
+      listRuns: () => [],
+      showRun: (runId) => ({
+        runId,
+        planId: "plan_1",
+        risk: "L1",
+        status: "completed",
+        startedAt: "2026-06-23T00:00:00Z",
+        stepCount: 0,
+        plan,
+        events: [],
+        steps: [],
+      }),
+      recordStepArtifacts: () => ({ stdoutPath: "stdout.txt", stderrPath: "stderr.txt" }),
+      close: () => {},
+    };
+    const handler = await createTuiRuntimeActionHandler({ facts: linuxFacts, auditStore });
+
+    const events = await handler({ type: "audit.run.open", runId: "run_1" }) ?? [];
+
+    expect(events).toEqual([
+      {
+        type: "audit.run.loaded",
+        report: expect.objectContaining({
+          summary: expect.objectContaining({ runId: "run_1", title: "Install nginx" }),
+        }),
+      },
+    ]);
+  });
 });
 
 describe("main TUI entry", () => {

@@ -1,6 +1,9 @@
 import { Command } from "commander";
+import { writeFile as writeFileDefault } from "node:fs/promises";
 import {
+  createAuditRunReport,
   createSqliteAuditStore,
+  formatAuditRunReport,
   resolveOpsForgePaths,
   type AuditRunDetail,
   type AuditRunSummary,
@@ -12,6 +15,7 @@ export interface BuildAuditDeps {
   auditStore?: AuditStore;
   config?: OpsForgeConfig;
   write?: (text: string) => void;
+  writeFile?: (path: string, contents: string) => Promise<void>;
 }
 
 const createStore = (deps: BuildAuditDeps): { store: AuditStore; shouldClose: boolean } => {
@@ -40,33 +44,12 @@ export const formatAuditList = (runs: AuditRunSummary[]): string => {
 
 export const formatAuditShow = (run: AuditRunDetail | undefined): string => {
   if (!run) return "Audit run not found";
-
-  const lines = [
-    `Audit run ${run.runId}`,
-    `  Plan:    ${run.planId}`,
-    `  Risk:    ${run.risk}`,
-    `  Status:  ${run.status}`,
-    `  Started: ${run.startedAt}`,
-    `  Ended:   ${run.endedAt ?? "-"}`,
-    `  Steps:   ${run.stepCount}`,
-    "Events",
-    ...run.events.map((event, index) => `${index + 1}. ${event.at}  ${event.type}`),
-  ];
-
-  if (run.steps.length > 0) {
-    lines.push("Artifacts");
-    for (const step of run.steps) {
-      lines.push(`  Step ${step.stepIndex}: exit=${step.exitCode ?? "-"}`);
-      if (step.stdoutPath) lines.push(`    stdout: ${step.stdoutPath}`);
-      if (step.stderrPath) lines.push(`    stderr: ${step.stderrPath}`);
-    }
-  }
-
-  return lines.join("\n");
+  return formatAuditRunReport(createAuditRunReport(run));
 };
 
 export const buildAuditCommand = (deps: BuildAuditDeps = {}): Command => {
   const write = deps.write ?? ((text: string) => console.log(text));
+  const writeFile = deps.writeFile ?? writeFileDefault;
   const command = new Command("audit").description("查看本机审计历史");
 
   command
@@ -94,6 +77,28 @@ export const buildAuditCommand = (deps: BuildAuditDeps = {}): Command => {
         const run = store.showRun(runId);
         write(options.json ? JSON.stringify(run ?? null, null, 2) : formatAuditShow(run));
         if (!run) process.exitCode = 1;
+      } finally {
+        closeIfNeeded(store, shouldClose);
+      }
+    });
+
+  command
+    .command("export")
+    .argument("<runId>", "Run ID")
+    .requiredOption("--out <file>", "导出 JSON 报告路径")
+    .description("导出一个审计 run 的富报告")
+    .action(async (runId: string, options: { out: string }) => {
+      const { store, shouldClose } = createStore(deps);
+      try {
+        const run = store.showRun(runId);
+        if (!run) {
+          write("Audit run not found");
+          process.exitCode = 1;
+          return;
+        }
+        const report = createAuditRunReport(run);
+        await writeFile(options.out, `${JSON.stringify(report, null, 2)}\n`);
+        write(`Exported audit report to ${options.out}`);
       } finally {
         closeIfNeeded(store, shouldClose);
       }

@@ -217,6 +217,59 @@ describe("formatTuiSnapshot", () => {
     expect(snapshot).toContain("Last prompt: diagnose nginx");
     expect(snapshot).toContain("Ask Forge > install nginx");
   });
+
+  it("renders loaded audit history and opened audit detail", () => {
+    const snapshot = formatTuiSnapshot(createTuiStatus({
+      facts: linuxFacts,
+      provider: "mock",
+      auditHistory: {
+        runs: [
+          {
+            runId: "run_1",
+            planId: "plan_1",
+            risk: "L2",
+            status: "rolled_back",
+            startedAt: "2026-06-23T00:00:00Z",
+            endedAt: "2026-06-23T00:00:05Z",
+            stepCount: 1,
+          },
+        ],
+      },
+      auditDetail: {
+        summary: {
+          runId: "run_1",
+          planId: "plan_1",
+          title: "Install nginx",
+          intent: "install",
+          risk: "L2",
+          status: "rolled_back",
+          startedAt: "2026-06-23T00:00:00Z",
+          endedAt: "2026-06-23T00:00:05Z",
+          stepCount: 1,
+        },
+        steps: [
+          {
+            stepIndex: 0,
+            label: "package-install nginx",
+            exitCode: 0,
+            stdoutPath: "artifacts/run_1/step-0-stdout.txt",
+          },
+        ],
+        eventTimeline: [
+          { index: 1, at: "2026-06-23T00:00:00Z", type: "plan.created" },
+        ],
+        artifactCount: 1,
+        verificationEventCount: 1,
+        rollback: { status: "finished", available: true, eventCount: 2 },
+      },
+    }));
+
+    expect(snapshot).toContain("Audit history");
+    expect(snapshot).toContain("1. run_1 plan=plan_1 risk=L2 status=rolled_back steps=1");
+    expect(snapshot).toContain("Audit detail: Install nginx (run_1)");
+    expect(snapshot).toContain("package-install nginx exit=0");
+    expect(snapshot).toContain("artifacts/run_1/step-0-stdout.txt");
+  });
 });
 
 describe("createTuiPlanCard", () => {
@@ -466,6 +519,48 @@ describe("reduceTuiEvent", () => {
     expect(state.status.approvalPrompt?.status).toBe("required");
     expect(state.status.rollbackPrompt?.status).toBe("recommended");
   });
+
+  it("stores loaded audit history and opened audit detail from events", () => {
+    let state = createInitialTuiState(createTuiStatus({ facts: linuxFacts, provider: "mock" }));
+    state = reduceTuiEvent(state, {
+      type: "audit.history.loaded",
+      history: {
+        runs: [
+          {
+            runId: "run_1",
+            planId: "plan_1",
+            risk: "L1",
+            status: "completed",
+            startedAt: "2026-06-23T00:00:00Z",
+            stepCount: 1,
+          },
+        ],
+      },
+    });
+    state = reduceTuiEvent(state, {
+      type: "audit.run.loaded",
+      report: {
+        summary: {
+          runId: "run_1",
+          planId: "plan_1",
+          title: "Install nginx",
+          intent: "install",
+          risk: "L1",
+          status: "completed",
+          startedAt: "2026-06-23T00:00:00Z",
+          stepCount: 1,
+        },
+        steps: [],
+        eventTimeline: [],
+        artifactCount: 0,
+        verificationEventCount: 0,
+        rollback: { status: "not-recorded", available: false, eventCount: 0 },
+      },
+    });
+
+    expect(state.status.auditHistory?.runs[0]?.runId).toBe("run_1");
+    expect(state.status.auditDetail?.summary.title).toBe("Install nginx");
+  });
 });
 
 describe("reduceTuiEvents", () => {
@@ -626,5 +721,29 @@ describe("reduceTuiKeyInput", () => {
 
     expect(reduceTuiKeyInput(state, "r", {}).action).toEqual({ type: "rollback.run", runId: "run_plan_nginx" });
     expect(reduceTuiKeyInput(state, "s", {}).action).toEqual({ type: "rollback.skip", runId: "run_plan_nginx" });
+  });
+
+  it("emits audit history and run-open actions", () => {
+    let state = createInitialTuiState(createTuiStatus({ facts: linuxFacts, provider: "mock" }));
+
+    expect(reduceTuiKeyInput(state, "h", {}).action).toEqual({ type: "audit.history.load" });
+
+    state = reduceTuiEvent(state, {
+      type: "audit.history.loaded",
+      history: {
+        runs: [
+          {
+            runId: "run_1",
+            planId: "plan_1",
+            risk: "L1",
+            status: "completed",
+            startedAt: "2026-06-23T00:00:00Z",
+            stepCount: 1,
+          },
+        ],
+      },
+    });
+
+    expect(reduceTuiKeyInput(state, "1", {}).action).toEqual({ type: "audit.run.open", runId: "run_1" });
   });
 });

@@ -39,6 +39,7 @@ Implemented plans:
 - Plan 25: `docs/superpowers/plans/2026-06-23-opsforge-plan-25-skill-templates.md`
 - Plan 26: `docs/superpowers/plans/2026-06-23-opsforge-plan-26-tui-audit-rollback.md`
 - Plan 27: `docs/superpowers/plans/2026-06-23-opsforge-plan-27-safe-elevation.md`
+- Plan 28: `docs/superpowers/plans/2026-06-23-opsforge-plan-28-tui-audit-reports.md`
 
 ## Delivered In Plan 1
 
@@ -366,6 +367,21 @@ Implemented plans:
   - `opsforge doctor` now reports that privileged operations will be blocked until OpsForge is started from an elevated shell.
   - TUI status inherits the same doctor warning source because no-argument launch builds from the doctor report.
 
+## Delivered In Plan 28
+
+- `@opsforge/audit`
+  - Added a deterministic `AuditRunReport` model that summarizes stored run detail into plan identity, risk/status, ordered events, step exits, artifact paths, verification event counts, and rollback state.
+  - Added a stable human formatter for rich audit reports so consumers do not parse raw SQLite rows or raw event payloads.
+
+- `@opsforge/tui`
+  - Added audit history and audit detail view models/rendering to the TUI status, reducer, snapshots, and Ink shell.
+  - Added keyboard actions for the primary TUI path: press `h` with an empty prompt to load audit history, then press `1`-`9` to open a listed run.
+
+- `@opsforge/cli`
+  - No-argument TUI runtime handling now maps audit history/detail actions to the configured `AuditStore`.
+  - `opsforge audit show <run_id>` now uses the shared rich report formatter.
+  - `opsforge audit export <run_id> --out <file>` writes the same rich report model as JSON for scripts and support bundles.
+
 ## Design Alignment Check
 
 | Spec Area | Status | Evidence | Notes |
@@ -377,9 +393,9 @@ Implemented plans:
 | §4.3 Windows executor | Partial | `packages/executor-windows`, `apps/cli/src/host-facts.ts`, `packages/core/src/execute.ts` | Compile layer exists for winget/choco, services, and stdin-backed file write/template operations. Doctor can detect admin status with `net session`, and core blocks privileged execution when not admin; automatic UAC relaunch remains open. |
 | §5 Policy and guard | Partial | `packages/policy` | Deterministic classifier/gate/guards exist. More rules and config knobs are needed. |
 | §6 Planner/provider layer | Partial | `packages/planner`, `packages/config`, `packages/pi-runtime`, `apps/cli/src/provider.ts`, `apps/cli/src/commands/doctor.ts`, `skills/` | Provider boundary, DSL validation, mock provider, deterministic skill templates, persistent provider config, OpenAI-compatible adapter, Anthropic adapter, Google adapter, provider capability reporting, typed Pi runtime event bridge, and runtime action controller exist. Real Pi SDK sessions, JSON retry/tool-call retry loops, and model discovery remain. |
-| §7.1 TUI mode | Partial | `packages/tui`, `packages/tui/src/plan-card.ts`, `packages/tui/src/timeline.ts`, `packages/tui/src/prompts.ts`, `packages/tui/src/state.ts`, `packages/tui/src/runtime-adapter.ts`, `packages/tui/src/controls.ts`, `packages/pi-runtime/src/actions.ts`, `apps/cli/src/index.ts`, `apps/cli/src/tui-runtime.ts`, `packages/planner/src/skill-templates.ts` | `@opsforge/tui` exists, `opsforge` no-arg enters the TUI path in TTY, a deterministic Plan card can render risk/prechecks/steps/compiled command previews/verifications/rollback preview/explanation, a deterministic execution timeline can render step output/exit codes/verification results/rollback recommendations, inline approval/rollback prompt states can render, a pure event/input reducer can drive those views, runtime events can be adapted into TUI events, keyboard input can emit typed prompt/approval/rollback actions, async TUI action handlers can feed returned events back into state, the no-arg CLI entry now wires prompt submission to provider planning plus guarded core execution and stored-audit rollback execution, and planner skill templates are available through that same prompt path. Real Pi SDK streaming and browseable TUI audit history remain. |
-| §7.2 CLI mode | Partial | `apps/cli/src/commands` | `doctor`, `plan`, `plan --out`, `run`, `apply`, `verify`, `rollback`, `config provider/show`, and `audit ls/show` exist. `doctor` now reports richer HostFacts and readiness warnings; `apply` and `run` support `--auto-rollback`; default verification includes read-only host probes. |
-| §8 Audit | Partial | `packages/audit` | SQLite event store, stored Plan JSON, and stdout/stderr artifacts exist. Rich reports, retention/export, rollback audit views, and TUI timeline consumption remain. |
+| §7.1 TUI mode | Partial | `packages/tui`, `packages/tui/src/plan-card.ts`, `packages/tui/src/timeline.ts`, `packages/tui/src/prompts.ts`, `packages/tui/src/state.ts`, `packages/tui/src/runtime-adapter.ts`, `packages/tui/src/controls.ts`, `packages/tui/src/audit-history.ts`, `packages/pi-runtime/src/actions.ts`, `apps/cli/src/index.ts`, `apps/cli/src/tui-runtime.ts`, `packages/planner/src/skill-templates.ts` | `@opsforge/tui` exists, `opsforge` no-arg enters the TUI path in TTY, a deterministic Plan card can render risk/prechecks/steps/compiled command previews/verifications/rollback preview/explanation, a deterministic execution timeline can render step output/exit codes/verification results/rollback recommendations, inline approval/rollback prompt states can render, a pure event/input reducer can drive those views, runtime events can be adapted into TUI events, keyboard input can emit typed prompt/approval/rollback/audit actions, async TUI action handlers can feed returned events back into state, the no-arg CLI entry now wires prompt submission to provider planning plus guarded core execution, stored-audit rollback execution, and stored-audit history/detail loading, and planner skill templates are available through that same prompt path. Real Pi SDK streaming remains. |
+| §7.2 CLI mode | Partial | `apps/cli/src/commands` | `doctor`, `plan`, `plan --out`, `run`, `apply`, `verify`, `rollback`, `config provider/show`, `audit ls/show/export` exist. `doctor` now reports richer HostFacts and readiness warnings; `apply` and `run` support `--auto-rollback`; default verification includes read-only host probes. |
+| §8 Audit | Partial | `packages/audit` | SQLite event store, stored Plan JSON, stdout/stderr artifacts, rich reports, JSON report export, rollback audit event summaries, and TUI history/detail consumption exist. Retention/pruning remains. |
 | §11 Tests | Partial | package tests | Unit tests cover deterministic components, all current verifier variants, default verifier probe command generation, local TCP port checks, HostFacts detection, doctor warnings, TUI snapshot rendering, and no-arg TUI entry decisions without mutating the host. |
 
 ## TUI-First Roadmap
@@ -400,11 +416,12 @@ The implementation priority is now locked back to the design document's product 
 - Plan 25: Add deterministic skill templates for common local operations and feed them into the planner/TUI path.
 - Plan 26: Wire TUI rollback actions to stored audit rollback execution.
 - Plan 27: Block privileged execution on non-elevated hosts and surface actionable doctor guidance.
-- After Plan 27: continue with richer audit/export reporting and optional automatic elevation launchers.
+- Plan 28: Add TUI audit history/detail reports and shared CLI export/report formatting.
+- After Plan 28: remaining work is no longer basic local TUI/control-plane plumbing; it is deeper provider/Pi SDK fidelity and hardening.
 
 ## Remaining Implementation Estimate
 
-To finish the full Phase 1 MVP described in the design document, the project likely needs roughly 1 more plan-sized slice after Plan 27. The immediate remaining track is richer audit/export/reporting.
+The local TUI-first Phase 1 spine is now implemented through planning, approval, execution, verification, rollback, audit persistence, audit report browsing, and safe elevation blocking. Remaining work is mainly fidelity/hardening rather than missing primary local flow.
 
 ## Known Gaps
 
@@ -412,13 +429,13 @@ To finish the full Phase 1 MVP described in the design document, the project lik
 - Planner JSON-mode retry/tool-call retry loops are not implemented.
 - Anthropic and Google provider adapters exist, but provider retry/repair loops and live model discovery are not implemented.
 - TUI primary entry, deterministic state/rendering, runtime-event adaptation, keyboard action emission, runtime action handling, and no-arg provider/core callback wiring exist.
-- TUI rollback prompt rendering, rollback key actions, and no-arg stored audit rollback execution are wired; browseable audit history inside the TUI remains open.
+- TUI rollback prompt rendering, rollback key actions, no-arg stored audit rollback execution, and browseable audit history/detail reports are wired.
 - Verification replay is manual only; no scheduled or automatic verification loop exists yet.
 - Default verifier probes and HostFacts detection are basic; package-manager edge cases, distro-specific nuance, and automatic sudo/UAC relaunch remain open.
 - File write/template steps now execute through stdin-backed commands, but atomic backup/restore snapshots and secret redaction remain open.
-- Rollback reporting is basic and does not yet provide rich rollback views in audit output.
-- Audit retention/export and richer report generation are not implemented.
-- TUI timeline consumption of audit history is not implemented.
+- Rollback reporting is summarized in rich audit reports; a dedicated rollback drilldown view remains open.
+- Audit JSON export and richer report generation are implemented; retention/pruning remains open.
+- TUI audit history/detail consumption is implemented; full timeline replay from historical run artifacts remains open.
 - Provider capability reporting exists in doctor; live model capability checks are not implemented.
 - Only the Plan JSON Schema artifact is exported; job, approval, inventory, and audit schema artifacts remain.
 - Generated plans are persisted as files, not yet in a first-class plan registry.
@@ -427,4 +444,4 @@ To finish the full Phase 1 MVP described in the design document, the project lik
 
 ## Next Plan Recommendation
 
-Plan 28 should focus on richer audit export/reporting so users can inspect execution, verification, rollback, and artifacts without reading raw SQLite state.
+Next plans should target one of the remaining hardening tracks: real Pi SDK session integration, provider retry/repair loops, or atomic file backup/restore with secret redaction.

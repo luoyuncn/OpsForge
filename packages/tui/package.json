@@ -19,6 +19,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@opsforge/audit": "workspace:*",
     "@opsforge/core": "workspace:*",
     "@opsforge/dsl": "workspace:*",
     "@opsforge/executor-base": "workspace:*",

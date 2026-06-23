@@ -308,6 +308,9 @@ importers:
 
   packages/tui:
     dependencies:
+      '@opsforge/audit':
+        specifier: workspace:*
+        version: link:../audit
       '@opsforge/core':
         specifier: workspace:*
         version: link:../core

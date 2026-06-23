@@ -1,5 +1,7 @@
 import type { ExecutePlanResult } from "@opsforge/core";
 import type { Plan } from "@opsforge/dsl";
+import type { AuditRunReport } from "@opsforge/audit";
+import { formatAuditDetailSnapshot, formatAuditHistorySnapshot, type TuiAuditHistory } from "./audit-history";
 import { createTuiPlanCard, formatPlanCardSnapshot } from "./plan-card";
 import {
   createApprovalPrompt,
@@ -39,7 +41,9 @@ export type TuiEvent =
   | { type: "plan.ready"; plan: Plan }
   | { type: "execution.finished"; result: ExecutePlanResult }
   | { type: "approval.requested"; approval: ApprovalPromptInput }
-  | { type: "rollback.requested"; rollbackPrompt: RollbackPromptInput };
+  | { type: "rollback.requested"; rollbackPrompt: RollbackPromptInput }
+  | { type: "audit.history.loaded"; history: TuiAuditHistory }
+  | { type: "audit.run.loaded"; report: AuditRunReport };
 
 export const createInitialTuiState = (status: TuiStatus): TuiState => ({
   status,
@@ -99,6 +103,16 @@ export const reduceTuiEvent = (state: TuiState, event: TuiEvent): TuiState => {
         ...state,
         status: { ...state.status, rollbackPrompt: createRollbackPrompt(event.rollbackPrompt) },
       };
+    case "audit.history.loaded":
+      return {
+        ...state,
+        status: { ...state.status, auditHistory: event.history },
+      };
+    case "audit.run.loaded":
+      return {
+        ...state,
+        status: { ...state.status, auditDetail: event.report },
+      };
   }
 };
 
@@ -113,4 +127,6 @@ export const formatTuiStateSnapshot = (state: TuiState): string => [
   state.status.timeline ? formatExecutionTimelineSnapshot(state.status.timeline) : undefined,
   state.status.approvalPrompt ? formatApprovalPromptSnapshot(state.status.approvalPrompt) : undefined,
   state.status.rollbackPrompt ? formatRollbackPromptSnapshot(state.status.rollbackPrompt) : undefined,
+  state.status.auditHistory ? formatAuditHistorySnapshot(state.status.auditHistory) : undefined,
+  state.status.auditDetail ? formatAuditDetailSnapshot(state.status.auditDetail) : undefined,
 ].filter((line): line is string => Boolean(line)).join("\n");

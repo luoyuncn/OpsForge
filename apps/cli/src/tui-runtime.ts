@@ -1,4 +1,4 @@
-import { createSqliteAuditStore, resolveOpsForgePaths, type AuditStore } from "@opsforge/audit";
+import { createAuditRunReport, createSqliteAuditStore, resolveOpsForgePaths, type AuditStore } from "@opsforge/audit";
 import { loadConfigFile, type OpsForgeConfig } from "@opsforge/config";
 import type { Plan } from "@opsforge/dsl";
 import type { HostFacts } from "@opsforge/executor-base";
@@ -60,6 +60,26 @@ export const createTuiRuntimeActionHandler = async (
     if (deps.auditStore) return { store: deps.auditStore, shouldClose: false };
     const currentConfig = await getConfig();
     return { store: createSqliteAuditStore(resolveOpsForgePaths(currentConfig)), shouldClose: true };
+  };
+
+  const loadAuditHistory = async (): Promise<TuiEvent[]> => {
+    const { store, shouldClose } = await getRollbackStore();
+    try {
+      return [{ type: "audit.history.loaded", history: { runs: store.listRuns() } }];
+    } finally {
+      if (shouldClose) store.close();
+    }
+  };
+
+  const openAuditRun = async (runId: string): Promise<TuiEvent[]> => {
+    const { store, shouldClose } = await getRollbackStore();
+    try {
+      const detail = store.showRun(runId);
+      if (!detail) throw new Error(`Audit run not found: ${runId}`);
+      return [{ type: "audit.run.loaded", report: createAuditRunReport(detail) }];
+    } finally {
+      if (shouldClose) store.close();
+    }
   };
 
   const rollbackRun = async (runId: string): Promise<ApplyResult> => {
@@ -125,6 +145,8 @@ export const createTuiRuntimeActionHandler = async (
 
   return async (action) => {
     try {
+      if (action.type === "audit.history.load") return loadAuditHistory();
+      if (action.type === "audit.run.open") return openAuditRun(action.runId);
       return runtimeEventsToTuiEvents(await controller.handle(action));
     } catch (error) {
       return errorToTuiEvent(error);
