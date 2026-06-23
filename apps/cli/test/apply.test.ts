@@ -110,6 +110,34 @@ describe("buildApplyCommand", () => {
     ]);
   });
 
+  it("executes file writes with stdin instead of embedding content in argv", async () => {
+    const seen: Array<{ argv: string[] | string; stdin?: string }> = [];
+    const apply = buildApplyCommand({
+      readFile: async () =>
+        JSON.stringify({
+          ...installPlan,
+          steps: [{ type: "file-write", path: "/tmp/opsforge.conf", content: "hello from stdin" }],
+          risk: "L2",
+        }),
+      platform: "linux",
+      facts,
+      auditStore: createFakeAuditStore(),
+      runner: async (command) => {
+        seen.push({ argv: command.argv, stdin: command.stdin });
+        return { stdout: "written", stderr: "", exitCode: 0 };
+      },
+    });
+
+    const result = await apply("plan.json", { dryRun: false, yes: true, json: false, riskMax: "L3", allowShell: false });
+
+    expect(result.stepResults).toHaveLength(1);
+    expect(seen[0]).toEqual({
+      argv: ["install", "-D", "-m", "0644", "/dev/stdin", "/tmp/opsforge.conf"],
+      stdin: "hello from stdin",
+    });
+    expect(JSON.stringify(seen[0].argv)).not.toContain("hello from stdin");
+  });
+
   it("uses detected host facts when explicit facts are not supplied", async () => {
     const apply = buildApplyCommand({
       readFile: async () => JSON.stringify(installPlan),

@@ -1,5 +1,5 @@
 import type { Step } from "@opsforge/dsl";
-import type { CompiledCommand, HostFacts } from "@opsforge/executor-base";
+import { renderFileTemplate, type CompiledCommand, type HostFacts } from "@opsforge/executor-base";
 
 const selectPackageManager = (facts: HostFacts): "apt" | "dnf" | "yum" => {
   if (facts.packageManagers.includes("apt")) return "apt";
@@ -20,6 +20,14 @@ const packageCommand = (action: "install" | "remove" | "update-cache", name: str
   return { shell: "bash", argv, needsElevation: true, describe: `${action === "install" ? "Install" : "Remove"} package ${name} with ${pm}` };
 };
 
+const fileWriteCommand = (path: string, content: string, mode = "0644", describe = `Write file ${path}`): CompiledCommand => ({
+  shell: "bash",
+  argv: ["install", "-D", "-m", mode, "/dev/stdin", path],
+  stdin: content,
+  needsElevation: true,
+  describe,
+});
+
 export const compileLinuxStep = (step: Step, facts: HostFacts): CompiledCommand => {
   switch (step.type) {
     case "package-update-cache":
@@ -37,9 +45,14 @@ export const compileLinuxStep = (step: Step, facts: HostFacts): CompiledCommand 
     case "service-status":
       return { shell: "bash", argv: ["systemctl", "status", step.name], needsElevation: false, describe: `Check service ${step.name}` };
     case "file-write":
-      return { shell: "bash", argv: ["tee", step.path], needsElevation: true, describe: `Write file ${step.path}` };
+      return fileWriteCommand(step.path, step.content, step.mode, `Write file ${step.path}`);
     case "file-template":
-      return { shell: "bash", argv: ["tee", step.path], needsElevation: true, describe: `Render template to ${step.path}` };
+      return fileWriteCommand(
+        step.path,
+        renderFileTemplate(step.template, step.vars),
+        "0644",
+        `Render template to ${step.path}`,
+      );
     case "shell":
       return { shell: step.shell ?? "bash", argv: step.cmd, needsElevation: false, describe: "Run shell command" };
   }

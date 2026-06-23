@@ -1,5 +1,5 @@
 import type { Step } from "@opsforge/dsl";
-import type { CompiledCommand, HostFacts } from "@opsforge/executor-base";
+import { renderFileTemplate, type CompiledCommand, type HostFacts } from "@opsforge/executor-base";
 
 const selectPackageManager = (facts: HostFacts): "winget" | "choco" => {
   if (facts.packageManagers.includes("winget")) return "winget";
@@ -18,6 +18,16 @@ const packageCommand = (action: "install" | "remove", name: string, facts: HostF
   return { shell: "powershell", argv: ["choco", verb, name, "-y"], needsElevation: true, describe: `${action === "install" ? "Install" : "Remove"} package ${name} with choco` };
 };
 
+const powerShellString = (value: string): string => `'${value.replaceAll("'", "''")}'`;
+
+const fileWriteCommand = (path: string, content: string, describe: string): CompiledCommand => ({
+  shell: "powershell",
+  argv: `$input | Set-Content -LiteralPath ${powerShellString(path)} -NoNewline -Encoding UTF8`,
+  stdin: content,
+  needsElevation: true,
+  describe,
+});
+
 export const compileWindowsStep = (step: Step, facts: HostFacts): CompiledCommand => {
   switch (step.type) {
     case "package-update-cache":
@@ -35,9 +45,9 @@ export const compileWindowsStep = (step: Step, facts: HostFacts): CompiledComman
     case "service-status":
       return { shell: "powershell", argv: ["Get-Service", "-Name", step.name], needsElevation: false, describe: `Check service ${step.name}` };
     case "file-write":
-      return { shell: "powershell", argv: ["Set-Content", "-LiteralPath", step.path, "-Value", step.content], needsElevation: true, describe: `Write file ${step.path}` };
+      return fileWriteCommand(step.path, step.content, `Write file ${step.path}`);
     case "file-template":
-      return { shell: "powershell", argv: ["Set-Content", "-LiteralPath", step.path, "-Value", step.template], needsElevation: true, describe: `Render template to ${step.path}` };
+      return fileWriteCommand(step.path, renderFileTemplate(step.template, step.vars), `Render template to ${step.path}`);
     case "shell":
       return { shell: "powershell", argv: step.cmd, needsElevation: false, describe: "Run PowerShell command" };
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { runCompiledCommand } from "../src/index";
+import { renderFileTemplate, runCompiledCommand } from "../src/index";
 
 describe("runCompiledCommand", () => {
   it("wraps runner output in a StepResult", async () => {
@@ -27,5 +27,15 @@ describe("runCompiledCommand", () => {
 
     expect(result.truncated).toBe(true);
     expect(Buffer.byteLength(result.stdout + result.stderr, "utf8")).toBeLessThanOrEqual(5);
+  });
+});
+
+describe("renderFileTemplate", () => {
+  it("replaces double-brace variables deterministically", () => {
+    expect(renderFileTemplate("hello {{name}}", { name: "Forge" })).toBe("hello Forge");
+  });
+
+  it("keeps missing variables visible", () => {
+    expect(renderFileTemplate("hello {{missing}}", { name: "Forge" })).toBe("hello {{missing}}");
   });
 });

@@ -25,4 +25,24 @@ describe("linux compile", () => {
     expect(cmd.argv).toEqual(["systemctl", "start", "nginx"]);
     expect(cmd.needsElevation).toBe(true);
   });
+
+  it("compiles file writes with content passed through stdin", () => {
+    const cmd = createLinuxExecutor().compile({ type: "file-write", path: "/tmp/opsforge.conf", content: "hello", mode: "0600" }, facts);
+
+    expect(cmd.argv).toEqual(["install", "-D", "-m", "0600", "/dev/stdin", "/tmp/opsforge.conf"]);
+    expect(cmd.stdin).toBe("hello");
+    expect(JSON.stringify(cmd.argv)).not.toContain("hello");
+  });
+
+  it("renders file templates before passing content through stdin", () => {
+    const cmd = createLinuxExecutor().compile({
+      type: "file-template",
+      path: "/tmp/opsforge.conf",
+      template: "hello {{name}}",
+      vars: { name: "Forge" },
+    }, facts);
+
+    expect(cmd.argv).toEqual(["install", "-D", "-m", "0644", "/dev/stdin", "/tmp/opsforge.conf"]);
+    expect(cmd.stdin).toBe("hello Forge");
+  });
 });

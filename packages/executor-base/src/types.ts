@@ -14,6 +14,7 @@ export interface CompiledCommand {
   shell: "bash" | "powershell";
   needsElevation: boolean;
   describe: string;
+  stdin?: string;
 }
 
 export interface RawCommandResult {

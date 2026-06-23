@@ -35,6 +35,7 @@ Implemented plans:
 - Plan 21: `docs/superpowers/plans/2026-06-23-opsforge-plan-21-runtime-action-controller.md`
 - Plan 22: `docs/superpowers/plans/2026-06-23-opsforge-plan-22-provider-depth-capabilities.md`
 - Plan 23: `docs/superpowers/plans/2026-06-23-opsforge-plan-23-tui-runtime-wiring.md`
+- Plan 24: `docs/superpowers/plans/2026-06-23-opsforge-plan-24-safe-file-write-template.md`
 
 ## Delivered In Plan 1
 
@@ -311,15 +312,33 @@ Implemented plans:
   - Prompt submission resolves the configured provider, builds a DSL-validated Plan, and executes low-risk or approved Plans through the existing guarded `executeParsedPlan()` path.
   - Runtime events are converted into TUI reducer events, keeping host mutation behind planner/core callbacks.
 
+## Delivered In Plan 24
+
+- `@opsforge/executor-base`
+  - Added optional `CompiledCommand.stdin` so command content can be supplied without interpolating it into shell arguments.
+  - Added deterministic `renderFileTemplate()` for `{{name}}` style template variables, keeping missing variables visible.
+
+- `@opsforge/executor-linux`
+  - `file-write` now compiles to `install -D -m <mode> /dev/stdin <path>` with content passed through stdin.
+  - `file-template` now renders variables first and writes rendered content through stdin.
+
+- `@opsforge/executor-windows`
+  - `file-write` and `file-template` now compile to stdin-backed PowerShell `Set-Content -LiteralPath ...` commands.
+  - File contents no longer appear in Windows command arguments.
+
+- `@opsforge/cli`
+  - The default local command runner now writes `CompiledCommand.stdin` into child process stdin.
+  - Apply tests cover stdin-backed file-write execution with an injected runner and no real host mutation.
+
 ## Design Alignment Check
 
 | Spec Area | Status | Evidence | Notes |
 |---|---:|---|---|
 | §3 DSL | Partial | `packages/dsl`, `schemas/plan.schema.json` | Core schema and Plan JSON Schema export exist. Job/approval/inventory/audit schema artifacts remain. |
 | §4 Core pipeline | Partial | `packages/core/src/execute.ts`, `apps/cli/src/commands/run.ts`, `apps/cli/src/commands/rollback.ts`, `apps/cli/src/commands/verify.ts` | Deterministic spine exists, is reachable from NL via `run`, can manually replay stored verifications, recommends rollback by default on failure, and can auto-run rollback when explicitly requested. |
-| §4.1 Executor abstraction | Partial | `packages/executor-base`, `apps/cli/src/host-facts.ts` | Interfaces and injectable runner exist. CLI now builds real local HostFacts for OS, arch, package managers, distro/version, and elevation. Safe elevation flows remain open. |
-| §4.2 Linux executor | Partial | `packages/executor-linux` | Compile layer exists for apt/dnf/yum and systemd. Real safe file writing needs a later pass. |
-| §4.3 Windows executor | Partial | `packages/executor-windows`, `apps/cli/src/host-facts.ts` | Compile layer exists for winget/choco and services. Doctor can detect admin status with `net session`; safe UAC elevation flow remains open. |
+| §4.1 Executor abstraction | Partial | `packages/executor-base`, `apps/cli/src/host-facts.ts`, `apps/cli/src/commands/apply.ts` | Interfaces, injectable runner, optional command stdin, deterministic template rendering, and real local HostFacts detection exist. Safe elevation flows remain open. |
+| §4.2 Linux executor | Partial | `packages/executor-linux` | Compile layer exists for apt/dnf/yum, systemd, and stdin-backed file write/template operations. Atomic backups and richer file permissions remain open. |
+| §4.3 Windows executor | Partial | `packages/executor-windows`, `apps/cli/src/host-facts.ts` | Compile layer exists for winget/choco, services, and stdin-backed file write/template operations. Doctor can detect admin status with `net session`; safe UAC elevation flow remains open. |
 | §5 Policy and guard | Partial | `packages/policy` | Deterministic classifier/gate/guards exist. More rules and config knobs are needed. |
 | §6 Planner/provider layer | Partial | `packages/planner`, `packages/config`, `packages/pi-runtime`, `apps/cli/src/provider.ts`, `apps/cli/src/commands/doctor.ts` | Provider boundary, DSL validation, mock provider, persistent provider config, OpenAI-compatible adapter, Anthropic adapter, Google adapter, provider capability reporting, typed Pi runtime event bridge, and runtime action controller exist. Real Pi SDK sessions, JSON retry/tool-call retry loops, and model discovery remain. |
 | §7.1 TUI mode | Partial | `packages/tui`, `packages/tui/src/plan-card.ts`, `packages/tui/src/timeline.ts`, `packages/tui/src/prompts.ts`, `packages/tui/src/state.ts`, `packages/tui/src/runtime-adapter.ts`, `packages/tui/src/controls.ts`, `packages/pi-runtime/src/actions.ts`, `apps/cli/src/index.ts`, `apps/cli/src/tui-runtime.ts` | `@opsforge/tui` exists, `opsforge` no-arg enters the TUI path in TTY, a deterministic Plan card can render risk/prechecks/steps/compiled command previews/verifications/rollback preview/explanation, a deterministic execution timeline can render step output/exit codes/verification results/rollback recommendations, inline approval/rollback prompt states can render, a pure event/input reducer can drive those views, runtime events can be adapted into TUI events, keyboard input can emit typed prompt/approval/rollback actions, async TUI action handlers can feed returned events back into state, and the no-arg CLI entry now wires prompt submission to provider planning plus guarded core execution. Real Pi SDK streaming and TUI audit-history rollback lookup remain. |
@@ -341,11 +360,12 @@ The implementation priority is now locked back to the design document's product 
 - Plan 21: Add runtime action handling for prompt, approval, deny, rollback, and rollback-skip actions using injected planner/core callbacks.
 - Plan 22: Add Anthropic/Google provider depth and expose provider capability reporting in doctor.
 - Plan 23: Wire the no-argument TUI entry to runtime action handling, provider planning, and guarded core execution.
-- After Plan 23: continue with safe file write/template semantics, skill templates, safe elevation flows, and richer audit/reporting.
+- Plan 24: Add stdin-backed safe file-write and file-template execution semantics.
+- After Plan 24: continue with skill templates, safe elevation flows, and richer audit/reporting.
 
 ## Remaining Implementation Estimate
 
-To finish the full Phase 1 MVP described in the design document, the project likely needs roughly 2-3 more plan-sized slices after Plan 23. The immediate remaining tracks are safe file-write/template execution semantics, skill templates, safe elevation flows, and richer audit/export/reporting.
+To finish the full Phase 1 MVP described in the design document, the project likely needs roughly 2 more plan-sized slices after Plan 24. The immediate remaining tracks are skill templates, safe elevation flows, and richer audit/export/reporting.
 
 ## Known Gaps
 
@@ -357,6 +377,7 @@ To finish the full Phase 1 MVP described in the design document, the project lik
 - TUI inline rollback prompt rendering and rollback key actions exist, and runtime action handling can call an injected rollback callback, but the no-arg TUI entry has not yet wired it to stored audit rollback execution.
 - Verification replay is manual only; no scheduled or automatic verification loop exists yet.
 - Default verifier probes and HostFacts detection are basic; package-manager edge cases, distro-specific nuance, and safe elevation flows remain open.
+- File write/template steps now execute through stdin-backed commands, but atomic backup/restore snapshots and secret redaction remain open.
 - Rollback reporting is basic and does not yet provide rich rollback views in audit output.
 - Audit retention/export and richer report generation are not implemented.
 - TUI timeline consumption of audit history is not implemented.
@@ -368,4 +389,4 @@ To finish the full Phase 1 MVP described in the design document, the project lik
 
 ## Next Plan Recommendation
 
-Plan 24 should focus on safe file-write and file-template execution semantics, replacing placeholder compilers with guarded local write behavior that remains testable and auditable.
+Plan 25 should focus on first-class skill templates for common local operations such as install-nginx/install-docker/install-nodejs, keeping them as deterministic DSL examples that the planner/TUI can surface.

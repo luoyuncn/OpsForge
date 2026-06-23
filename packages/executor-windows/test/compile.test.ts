@@ -25,4 +25,25 @@ describe("windows compile", () => {
     expect(cmd.argv).toEqual(["Start-Service", "-Name", "nginx"]);
     expect(cmd.shell).toBe("powershell");
   });
+
+  it("compiles file writes with content passed through stdin", () => {
+    const cmd = createWindowsExecutor().compile({ type: "file-write", path: "C:\\Temp\\opsforge.conf", content: "hello" }, facts);
+
+    expect(cmd.shell).toBe("powershell");
+    expect(String(cmd.argv)).toContain("Set-Content");
+    expect(String(cmd.argv)).toContain("C:\\Temp\\opsforge.conf");
+    expect(cmd.stdin).toBe("hello");
+    expect(String(cmd.argv)).not.toContain("hello");
+  });
+
+  it("renders file templates before passing content through stdin", () => {
+    const cmd = createWindowsExecutor().compile({
+      type: "file-template",
+      path: "C:\\Temp\\opsforge.conf",
+      template: "hello {{name}}",
+      vars: { name: "Forge" },
+    }, facts);
+
+    expect(cmd.stdin).toBe("hello Forge");
+  });
 });

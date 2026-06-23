@@ -1,7 +1,6 @@
-import { execFile } from "node:child_process";
+import { spawn } from "node:child_process";
 import { readFile as readFileFromDisk } from "node:fs/promises";
 import { createConnection } from "node:net";
-import { promisify } from "node:util";
 import { createSqliteAuditStore, resolveOpsForgePaths, type AuditStore } from "@opsforge/audit";
 import { loadConfig, type OpsForgeConfig } from "@opsforge/config";
 import { executePlan, rollbackPlan, type ExecutePlanResult, type VerifyStoredPlanInput } from "@opsforge/core";
@@ -12,8 +11,6 @@ import { createWindowsExecutor } from "@opsforge/executor-windows";
 import { detectOs, detectPackageManagers, type WhichRunner } from "../detect";
 import { detectLocalHostFacts } from "../host-facts";
 import { systemWhich } from "../which";
-
-const execFileAsync = promisify(execFile);
 
 export interface ApplyOptions {
   dryRun: boolean;
@@ -60,13 +57,27 @@ const defaultRunner: CommandRunner = async (command): Promise<RawCommandResult> 
     : ["-lc", commandText];
   const shellBin = command.shell === "powershell" ? "powershell" : "bash";
 
-  try {
-    const result = await execFileAsync(shellBin, shellArgs, { windowsHide: true });
-    return { stdout: result.stdout, stderr: result.stderr, exitCode: 0 };
-  } catch (error) {
-    const err = error as { stdout?: string; stderr?: string; code?: number };
-    return { stdout: err.stdout ?? "", stderr: err.stderr ?? "", exitCode: typeof err.code === "number" ? err.code : 1 };
-  }
+  return new Promise((resolve) => {
+    const child = spawn(shellBin, shellArgs, { windowsHide: true });
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk: string) => {
+      stderr += chunk;
+    });
+    child.on("error", (error) => {
+      resolve({ stdout, stderr: stderr || error.message, exitCode: 1 });
+    });
+    child.on("close", (code) => {
+      resolve({ stdout, stderr, exitCode: typeof code === "number" ? code : 1 });
+    });
+    child.stdin.end(command.stdin ?? "");
+  });
 };
 
 const safeBashArg = (value: string): string =>
