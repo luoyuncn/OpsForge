@@ -16,7 +16,9 @@ import {
   formatTuiStateSnapshot,
   formatTuiSnapshot,
   reduceTuiEvent,
+  reduceTuiEvents,
   reduceTuiKeyInput,
+  type TuiActionHandler,
 } from "../src/index";
 import { runtimeEventToTuiEvent } from "../src/runtime-adapter";
 
@@ -463,6 +465,28 @@ describe("reduceTuiEvent", () => {
     expect(state.status.timeline?.runId).toBe("run_plan_nginx");
     expect(state.status.approvalPrompt?.status).toBe("required");
     expect(state.status.rollbackPrompt?.status).toBe("recommended");
+  });
+});
+
+describe("reduceTuiEvents", () => {
+  it("applies runtime-derived events in order", () => {
+    const state = createInitialTuiState(createTuiStatus({ facts: linuxFacts, provider: "mock" }));
+    const next = reduceTuiEvents(state, [
+      { type: "thinking.delta", text: "Planning safely." },
+      { type: "plan.ready", plan: nginxPlan },
+    ]);
+
+    expect(next.status.thinkingText).toBe("Planning safely.");
+    expect(next.status.planCard?.title).toBe("Install nginx");
+    expect(state.status.planCard).toBeUndefined();
+  });
+
+  it("types async TUI action handlers as event producers", async () => {
+    const handler: TuiActionHandler = async () => [{ type: "thinking.delta", text: "handled" }];
+
+    await expect(handler({ type: "submit.prompt", prompt: "install nginx" })).resolves.toEqual([
+      { type: "thinking.delta", text: "handled" },
+    ]);
   });
 });
 

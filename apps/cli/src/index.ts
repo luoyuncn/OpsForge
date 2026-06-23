@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { Command } from "commander";
 import { defaultConfigPath } from "@opsforge/config";
-import { createTuiStatus, formatTuiSnapshot, runTui } from "@opsforge/tui";
+import { createTuiStatus, formatTuiSnapshot, runTui as launchTui, type TuiActionHandler, type TuiStatus } from "@opsforge/tui";
 import { buildAuditCommand } from "./commands/audit";
 import { buildApplyCommand, formatApplyResult, parseRiskMax } from "./commands/apply";
 import { buildConfigCommand } from "./commands/config";
@@ -11,7 +11,9 @@ import { buildPlanCommand } from "./commands/plan";
 import { buildRollbackCommand } from "./commands/rollback";
 import { buildRunCommand } from "./commands/run";
 import { buildVerifyCommand } from "./commands/verify";
+import { createTuiRuntimeActionHandler } from "./tui-runtime";
 import { systemWhich } from "./which";
+import type { DoctorReport } from "./commands/doctor";
 
 const readOptionalConfigFile = (): string | null => {
   try {
@@ -84,16 +86,29 @@ export const buildProgram = (): Command => {
   return program;
 };
 
-export const main = async (argv = process.argv): Promise<void> => {
+export interface MainDeps {
+  stdinIsTty?: boolean;
+  stdoutIsTty?: boolean;
+  buildDoctorReport?: () => Promise<DoctorReport>;
+  runTui?: (status: TuiStatus, options?: { onAction?: TuiActionHandler }) => void;
+  createActionHandler?: (status: TuiStatus, report: DoctorReport) => Promise<TuiActionHandler>;
+  write?: (text: string) => void;
+}
+
+const buildDefaultDoctorReport = async (): Promise<DoctorReport> =>
+  buildDoctorReportAsync({
+    platform: process.platform,
+    which: systemWhich,
+    env: process.env,
+    fileContents: readOptionalConfigFile(),
+  });
+
+export const main = async (argv = process.argv, deps: MainDeps = {}): Promise<void> => {
   const args = argv.slice(2);
+  const write = deps.write ?? ((text: string) => console.log(text));
 
   if (args.length === 0) {
-    const report = await buildDoctorReportAsync({
-      platform: process.platform,
-      which: systemWhich,
-      env: process.env,
-      fileContents: readOptionalConfigFile(),
-    });
+    const report = await (deps.buildDoctorReport ?? buildDefaultDoctorReport)();
     const status = createTuiStatus({
       facts: report.facts,
       provider: report.provider,
@@ -101,12 +116,17 @@ export const main = async (argv = process.argv): Promise<void> => {
       auditLabel: "default",
     });
 
-    if (shouldLaunchTui(args, process.stdin.isTTY, process.stdout.isTTY)) {
-      runTui(status);
+    if (shouldLaunchTui(args, deps.stdinIsTty ?? process.stdin.isTTY, deps.stdoutIsTty ?? process.stdout.isTTY)) {
+      const onAction = await (deps.createActionHandler ?? (async () => createTuiRuntimeActionHandler({
+        facts: report.facts,
+        env: process.env,
+        configPath: defaultConfigPath(),
+      })))(status, report);
+      (deps.runTui ?? launchTui)(status, { onAction });
       return;
     }
 
-    console.log(formatNoTtyFallback(formatTuiSnapshot(status)));
+    write(formatNoTtyFallback(formatTuiSnapshot(status)));
     return;
   }
 

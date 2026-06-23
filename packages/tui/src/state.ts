@@ -102,6 +102,9 @@ export const reduceTuiEvent = (state: TuiState, event: TuiEvent): TuiState => {
   }
 };
 
+export const reduceTuiEvents = (state: TuiState, events: readonly TuiEvent[]): TuiState =>
+  events.reduce((current, event) => reduceTuiEvent(current, event), state);
+
 export const formatTuiStateSnapshot = (state: TuiState): string => [
   state.status.thinkingText ? `Thinking: ${state.status.thinkingText}` : undefined,
   state.status.lastSubmittedPrompt ? `Last prompt: ${state.status.lastSubmittedPrompt}` : undefined,

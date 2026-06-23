@@ -34,6 +34,7 @@ Implemented plans:
 - Plan 20: `docs/superpowers/plans/2026-06-23-opsforge-plan-20-tui-keyboard-session-controls.md`
 - Plan 21: `docs/superpowers/plans/2026-06-23-opsforge-plan-21-runtime-action-controller.md`
 - Plan 22: `docs/superpowers/plans/2026-06-23-opsforge-plan-22-provider-depth-capabilities.md`
+- Plan 23: `docs/superpowers/plans/2026-06-23-opsforge-plan-23-tui-runtime-wiring.md`
 
 ## Delivered In Plan 1
 
@@ -297,6 +298,19 @@ Implemented plans:
   - `opsforge doctor` now reports provider capabilities alongside HostFacts, elevation, risk, shell policy, and warnings.
   - `plan/run --provider` help text now reflects the implemented provider modes while keeping CLI secondary to the TUI-first path.
 
+## Delivered In Plan 23
+
+- `@opsforge/tui`
+  - Added `reduceTuiEvents()` for applying batches of runtime-derived events into the TUI state reducer.
+  - Added typed async `TuiActionHandler` support so keyboard actions can return TUI events after planner/core work completes.
+  - `TuiInteractiveApp` now feeds returned events back into the same Plan card, approval prompt, execution timeline, and rollback prompt state.
+
+- `@opsforge/cli`
+  - Added `createTuiRuntimeActionHandler()` to bridge TUI actions to `createRuntimeActionController()`.
+  - No-argument interactive `opsforge` now launches the TUI with a runtime action handler.
+  - Prompt submission resolves the configured provider, builds a DSL-validated Plan, and executes low-risk or approved Plans through the existing guarded `executeParsedPlan()` path.
+  - Runtime events are converted into TUI reducer events, keeping host mutation behind planner/core callbacks.
+
 ## Design Alignment Check
 
 | Spec Area | Status | Evidence | Notes |
@@ -308,7 +322,7 @@ Implemented plans:
 | §4.3 Windows executor | Partial | `packages/executor-windows`, `apps/cli/src/host-facts.ts` | Compile layer exists for winget/choco and services. Doctor can detect admin status with `net session`; safe UAC elevation flow remains open. |
 | §5 Policy and guard | Partial | `packages/policy` | Deterministic classifier/gate/guards exist. More rules and config knobs are needed. |
 | §6 Planner/provider layer | Partial | `packages/planner`, `packages/config`, `packages/pi-runtime`, `apps/cli/src/provider.ts`, `apps/cli/src/commands/doctor.ts` | Provider boundary, DSL validation, mock provider, persistent provider config, OpenAI-compatible adapter, Anthropic adapter, Google adapter, provider capability reporting, typed Pi runtime event bridge, and runtime action controller exist. Real Pi SDK sessions, JSON retry/tool-call retry loops, and model discovery remain. |
-| §7.1 TUI mode | Partial | `packages/tui`, `packages/tui/src/plan-card.ts`, `packages/tui/src/timeline.ts`, `packages/tui/src/prompts.ts`, `packages/tui/src/state.ts`, `packages/tui/src/runtime-adapter.ts`, `packages/tui/src/controls.ts`, `packages/pi-runtime/src/actions.ts`, `apps/cli/src/index.ts` | `@opsforge/tui` exists, `opsforge` no-arg enters the TUI path in TTY, a deterministic Plan card can render risk/prechecks/steps/compiled command previews/verifications/rollback preview/explanation, a deterministic execution timeline can render step output/exit codes/verification results/rollback recommendations, inline approval/rollback prompt states can render, a pure event/input reducer can drive those views, runtime events can be adapted into TUI events, keyboard input can emit typed prompt/approval/rollback actions, and runtime action handling can call injected planner/executor/rollback callbacks. The no-arg CLI entry still needs to instantiate the action controller with real provider/core callbacks, and real Pi SDK streaming remains. |
+| §7.1 TUI mode | Partial | `packages/tui`, `packages/tui/src/plan-card.ts`, `packages/tui/src/timeline.ts`, `packages/tui/src/prompts.ts`, `packages/tui/src/state.ts`, `packages/tui/src/runtime-adapter.ts`, `packages/tui/src/controls.ts`, `packages/pi-runtime/src/actions.ts`, `apps/cli/src/index.ts`, `apps/cli/src/tui-runtime.ts` | `@opsforge/tui` exists, `opsforge` no-arg enters the TUI path in TTY, a deterministic Plan card can render risk/prechecks/steps/compiled command previews/verifications/rollback preview/explanation, a deterministic execution timeline can render step output/exit codes/verification results/rollback recommendations, inline approval/rollback prompt states can render, a pure event/input reducer can drive those views, runtime events can be adapted into TUI events, keyboard input can emit typed prompt/approval/rollback actions, async TUI action handlers can feed returned events back into state, and the no-arg CLI entry now wires prompt submission to provider planning plus guarded core execution. Real Pi SDK streaming and TUI audit-history rollback lookup remain. |
 | §7.2 CLI mode | Partial | `apps/cli/src/commands` | `doctor`, `plan`, `plan --out`, `run`, `apply`, `verify`, `rollback`, `config provider/show`, and `audit ls/show` exist. `doctor` now reports richer HostFacts and readiness warnings; `apply` and `run` support `--auto-rollback`; default verification includes read-only host probes. |
 | §8 Audit | Partial | `packages/audit` | SQLite event store, stored Plan JSON, and stdout/stderr artifacts exist. Rich reports, retention/export, rollback audit views, and TUI timeline consumption remain. |
 | §11 Tests | Partial | package tests | Unit tests cover deterministic components, all current verifier variants, default verifier probe command generation, local TCP port checks, HostFacts detection, doctor warnings, TUI snapshot rendering, and no-arg TUI entry decisions without mutating the host. |
@@ -326,18 +340,20 @@ The implementation priority is now locked back to the design document's product 
 - Plan 20: Add real Ink keyboard handling and typed TUI user actions for prompt submission, approvals, L3 reasons, and rollback decisions.
 - Plan 21: Add runtime action handling for prompt, approval, deny, rollback, and rollback-skip actions using injected planner/core callbacks.
 - Plan 22: Add Anthropic/Google provider depth and expose provider capability reporting in doctor.
-- After Plan 22: continue with TUI real runtime wiring, safe file write/template semantics, skills, and richer audit/reporting.
+- Plan 23: Wire the no-argument TUI entry to runtime action handling, provider planning, and guarded core execution.
+- After Plan 23: continue with safe file write/template semantics, skill templates, safe elevation flows, and richer audit/reporting.
 
 ## Remaining Implementation Estimate
 
-To finish the full Phase 1 MVP described in the design document, the project likely needs roughly 3 more plan-sized slices after Plan 22. The immediate remaining tracks are wiring the no-arg TUI to real runtime callbacks, safe file-write/template execution semantics, skill templates, safe elevation flows, and richer audit/export/reporting.
+To finish the full Phase 1 MVP described in the design document, the project likely needs roughly 2-3 more plan-sized slices after Plan 23. The immediate remaining tracks are safe file-write/template execution semantics, skill templates, safe elevation flows, and richer audit/export/reporting.
 
 ## Known Gaps
 
 - Real Pi planner adapter and real Pi SDK session integration are not implemented.
 - Planner JSON-mode retry/tool-call retry loops are not implemented.
 - Anthropic and Google provider adapters exist, but provider retry/repair loops and live model discovery are not implemented.
-- TUI primary entry, deterministic state/rendering, runtime-event adaptation, keyboard action emission, and runtime action handling exist, but the no-arg CLI entry does not yet instantiate a real runtime session with provider/core callbacks.
+- TUI primary entry, deterministic state/rendering, runtime-event adaptation, keyboard action emission, runtime action handling, and no-arg provider/core callback wiring exist.
+- TUI runtime rollback key handling emits actions, but audit-history rollback lookup from the no-arg TUI is not wired yet.
 - TUI inline rollback prompt rendering and rollback key actions exist, and runtime action handling can call an injected rollback callback, but the no-arg TUI entry has not yet wired it to stored audit rollback execution.
 - Verification replay is manual only; no scheduled or automatic verification loop exists yet.
 - Default verifier probes and HostFacts detection are basic; package-manager edge cases, distro-specific nuance, and safe elevation flows remain open.
@@ -352,4 +368,4 @@ To finish the full Phase 1 MVP described in the design document, the project lik
 
 ## Next Plan Recommendation
 
-Plan 23 should focus on the TUI-first runtime seam: wire the no-argument TUI entry to the runtime action controller with real planner/core callbacks, while keeping non-TTY CLI fallback intact.
+Plan 24 should focus on safe file-write and file-template execution semantics, replacing placeholder compilers with guarded local write behavior that remains testable and auditable.

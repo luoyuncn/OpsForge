@@ -24,7 +24,7 @@ import {
   type TuiExecutionTimeline,
 } from "./timeline";
 import { reduceTuiKeyInput, type TuiUserAction } from "./controls";
-import { createInitialTuiState, type TuiState } from "./state";
+import { createInitialTuiState, reduceTuiEvents, type TuiEvent, type TuiState } from "./state";
 
 export {
   reduceTuiKeyInput,
@@ -37,6 +37,7 @@ export {
   createInitialTuiState,
   formatTuiStateSnapshot,
   reduceTuiEvent,
+  reduceTuiEvents,
   type TuiControlState,
   type TuiEvent,
   type TuiInputState,
@@ -191,8 +192,10 @@ export const TuiApp = ({ status }: TuiAppProps): React.ReactElement => (
 
 export interface TuiInteractiveAppProps {
   initialStatus: TuiStatus;
-  onAction?: (action: TuiUserAction) => void | Promise<void>;
+  onAction?: TuiActionHandler;
 }
+
+export type TuiActionHandler = (action: TuiUserAction) => void | readonly TuiEvent[] | Promise<void | readonly TuiEvent[]>;
 
 export const TuiInteractiveApp = ({ initialStatus, onAction }: TuiInteractiveAppProps): React.ReactElement => {
   const [state, setState] = React.useState<TuiState>(() => createInitialTuiState(initialStatus));
@@ -200,7 +203,11 @@ export const TuiInteractiveApp = ({ initialStatus, onAction }: TuiInteractiveApp
   useInput((input, key) => {
     setState((current) => {
       const result = reduceTuiKeyInput(current, input, key);
-      if (result.action) void onAction?.(result.action);
+      if (result.action) {
+        void Promise.resolve(onAction?.(result.action)).then((events) => {
+          if (events?.length) setState((latest) => reduceTuiEvents(latest, events));
+        });
+      }
       return result.state;
     });
   });
@@ -327,7 +334,11 @@ const RollbackPromptView = ({ prompt }: RollbackPromptViewProps): React.ReactEle
 const isTuiStatus = (options: TuiLaunchOptions | TuiStatus): options is TuiStatus =>
   "planCard" in options || "timeline" in options || "approvalPrompt" in options || "rollbackPrompt" in options;
 
-export const runTui = (options: TuiLaunchOptions | TuiStatus): void => {
+export interface RunTuiOptions {
+  onAction?: TuiActionHandler;
+}
+
+export const runTui = (options: TuiLaunchOptions | TuiStatus, runOptions: RunTuiOptions = {}): void => {
   const status = isTuiStatus(options) ? options : createTuiStatus(options);
-  render(<TuiInteractiveApp initialStatus={status} />);
+  render(<TuiInteractiveApp initialStatus={status} onAction={runOptions.onAction} />);
 };

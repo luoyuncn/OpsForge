@@ -22,6 +22,7 @@
     "@opsforge/executor-base": "workspace:*",
     "@opsforge/executor-linux": "workspace:*",
     "@opsforge/executor-windows": "workspace:*",
+    "@opsforge/pi-runtime": "workspace:*",
     "@opsforge/planner": "workspace:^",
     "@opsforge/tui": "workspace:*",
     "commander": "^12.1.0"

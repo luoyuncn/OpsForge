@@ -44,6 +44,9 @@ importers:
       '@opsforge/executor-windows':
         specifier: workspace:*
         version: link:../../packages/executor-windows
+      '@opsforge/pi-runtime':
+        specifier: workspace:*
+        version: link:../../packages/pi-runtime
       '@opsforge/planner':
         specifier: workspace:^
         version: link:../../packages/planner
