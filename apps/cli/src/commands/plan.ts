@@ -1,3 +1,5 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import { Command } from "commander";
 import type { Plan } from "@opsforge/dsl";
 import { buildPlanFromPrompt, createMockPlanProvider, type PlanProvider } from "@opsforge/planner";
@@ -5,6 +7,7 @@ import { buildPlanFromPrompt, createMockPlanProvider, type PlanProvider } from "
 export interface BuildPlanCommandDeps {
   provider?: PlanProvider;
   write?: (text: string) => void;
+  writeFile?: (path: string, text: string) => Promise<void>;
   now?: () => string;
   planId?: () => string;
 }
@@ -16,7 +19,12 @@ const stepToText = (step: Plan["steps"][number]): string => {
   return step.type;
 };
 
-export const formatPlanResult = (plan: Plan): string => [
+const writePlanFile = async (path: string, text: string): Promise<void> => {
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, text, "utf8");
+};
+
+export const formatPlanResult = (plan: Plan, savedPath?: string): string => [
   "OpsForge plan",
   `  Plan ID:            ${plan.id}`,
   `  Title:              ${plan.title}`,
@@ -26,6 +34,7 @@ export const formatPlanResult = (plan: Plan): string => [
   ...plan.steps.map((step, index) => `    ${index + 1}. ${stepToText(step)}`),
   `  Verifications:      ${plan.verifications.length}`,
   `  Rollback steps:     ${plan.rollback.length}`,
+  ...(savedPath ? [`  Saved:              ${savedPath}`] : []),
 ].join("\n");
 
 export const buildPlanCommand = (deps: BuildPlanCommandDeps = {}): Command => {
@@ -36,14 +45,19 @@ export const buildPlanCommand = (deps: BuildPlanCommandDeps = {}): Command => {
     .description("根据自然语言生成一个结构化 Plan（不执行）")
     .argument("<prompt>", "Natural language operation goal")
     .option("--json", "输出 JSON", false)
-    .action(async (prompt: string, options: { json: boolean }) => {
+    .option("--out <file>", "将 Plan JSON 写入文件")
+    .action(async (prompt: string, options: { json: boolean; out?: string }) => {
       const plan = await buildPlanFromPrompt({
         prompt,
         provider: deps.provider ?? createMockPlanProvider(),
         now: deps.now,
         planId: deps.planId,
       });
-      write(options.json ? JSON.stringify(plan, null, 2) : formatPlanResult(plan));
+      const json = JSON.stringify(plan, null, 2);
+      if (options.out) {
+        await (deps.writeFile ?? writePlanFile)(options.out, `${json}\n`);
+      }
+      write(options.json ? json : formatPlanResult(plan, options.out));
     });
 
   return command;

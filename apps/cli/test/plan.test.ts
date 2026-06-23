@@ -38,4 +38,25 @@ describe("buildPlanCommand", () => {
     expect(parsed.id).toBe("plan_cli_1");
     expect(parsed.steps[0]).toEqual({ type: "package-install", name: "nginx" });
   });
+
+  it("writes a schema-valid JSON plan to --out without changing stdout mode", async () => {
+    const writes: string[] = [];
+    const files: Record<string, string> = {};
+    const command = buildPlanCommand({
+      write: (text) => writes.push(text),
+      writeFile: async (path, text) => {
+        files[path] = text;
+      },
+      now: () => "2026-06-23T00:00:00Z",
+      planId: () => "plan_cli_out",
+    });
+
+    await command.parseAsync(["node", "test", "install nginx", "--out", "plans/nginx.json"], { from: "user" });
+
+    expect(writes[0]).toContain("OpsForge plan");
+    expect(writes[0]).toContain("Saved:              plans/nginx.json");
+    const parsed = JSON.parse(files["plans/nginx.json"]);
+    expect(parsed.id).toBe("plan_cli_out");
+    expect(parsed.steps[0]).toEqual({ type: "package-install", name: "nginx" });
+  });
 });
