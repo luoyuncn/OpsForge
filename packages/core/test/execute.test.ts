@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createMemoryAuditRecorder } from "@opsforge/audit";
 import type { Executor, HostFacts } from "@opsforge/executor-base";
 import type { Plan } from "@opsforge/dsl";
-import { executePlan } from "../src/index";
+import { executePlan, rollbackPlan } from "../src/index";
 
 const facts: HostFacts = {
   osFamily: "linux",
@@ -121,5 +121,62 @@ describe("executePlan", () => {
       "run.step.finished",
       "run.verified",
     ]);
+  });
+});
+
+describe("rollbackPlan", () => {
+  it("dry-runs rollback steps without calling the runner", async () => {
+    const audit = createMemoryAuditRecorder();
+    let runnerCalls = 0;
+    const result = await rollbackPlan({
+      plan: { ...basePlan, rollback: [{ type: "package-remove", name: "nginx" }] },
+      originalRunId: "run_original",
+      executor,
+      facts,
+      audit,
+      dryRun: true,
+      yes: false,
+      riskMax: "L3",
+      allowShell: false,
+      runner: async () => {
+        runnerCalls += 1;
+        return { stdout: "", stderr: "", exitCode: 0 };
+      },
+      verifyDeps: {},
+    });
+
+    expect(runnerCalls).toBe(0);
+    expect(result.commands[0].argv).toEqual(["echo", "package-remove"]);
+    expect(result.stepResults).toEqual([]);
+    expect(audit.events().map((event) => event.type)).toEqual([
+      "plan.created",
+      "plan.classified",
+      "gate.confirmed",
+      "run.rollback.started",
+      "job.dispatched",
+      "run.dry_run.finished",
+      "run.rollback.finished",
+    ]);
+  });
+
+  it("executes rollback steps and records rollback completion", async () => {
+    const audit = createMemoryAuditRecorder();
+    const result = await rollbackPlan({
+      plan: { ...basePlan, rollback: [{ type: "package-remove", name: "nginx" }] },
+      originalRunId: "run_original",
+      executor,
+      facts,
+      audit,
+      dryRun: false,
+      yes: true,
+      riskMax: "L3",
+      allowShell: false,
+      runner: async () => ({ stdout: "removed", stderr: "", exitCode: 0 }),
+      verifyDeps: {},
+    });
+
+    expect(result.stepResults).toHaveLength(1);
+    expect(result.stepResults[0].step).toEqual({ type: "package-remove", name: "nginx" });
+    expect(audit.events().map((event) => event.type)).toContain("run.rollback.finished");
   });
 });
