@@ -527,6 +527,19 @@ describe("reduceTuiEvent", () => {
     expect(state.status.thinkingText).toBe("Planning safely.");
   });
 
+  it("renders runtime errors as a separate status instead of appending to pending thinking", () => {
+    let state = createInitialTuiState(createTuiStatus({ facts: linuxFacts, provider: "mock" }));
+    state = reduceTuiEvent(state, { type: "thinking.delta", text: "Planning with the configured provider..." });
+    state = reduceTuiEvent(state, { type: "runtime.error", message: "Provider returned invalid OpsForge Plan DSL." });
+
+    expect(state.status.thinkingText).toBeUndefined();
+    expect(state.status.errorText).toBe("Provider returned invalid OpsForge Plan DSL.");
+
+    const snapshot = formatTuiSnapshot(state.status);
+    expect(snapshot).toContain("Error: Provider returned invalid OpsForge Plan DSL.");
+    expect(snapshot).not.toContain("Planning with the configured provider...Provider");
+  });
+
   it("builds renderable plan, execution, approval, and rollback state from events", () => {
     let state = createInitialTuiState(createTuiStatus({ facts: linuxFacts, provider: "mock" }));
     state = reduceTuiEvent(state, { type: "plan.ready", plan: nginxPlan });
@@ -683,7 +696,7 @@ describe("runtimeEventToTuiEvent", () => {
     expect(state.status.rollbackPrompt?.status).toBe("recommended");
   });
 
-  it("ignores session and error runtime events until the TUI has dedicated views for them", () => {
+  it("ignores session events and maps runtime errors into dedicated TUI error state", () => {
     expect(runtimeEventToTuiEvent({
       type: "runtime.session.started",
       status: {
@@ -694,7 +707,7 @@ describe("runtimeEventToTuiEvent", () => {
       },
     })).toBeUndefined();
     expect(runtimeEventToTuiEvent({ type: "runtime.error", message: "provider failed", recoverable: true }))
-      .toBeUndefined();
+      .toEqual({ type: "runtime.error", message: "provider failed" });
   });
 });
 

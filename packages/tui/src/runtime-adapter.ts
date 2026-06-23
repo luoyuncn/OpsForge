@@ -13,8 +13,9 @@ export const runtimeEventToTuiEvent = (event: RuntimeEvent): TuiEvent | undefine
       return { type: "approval.requested", approval: event.approval };
     case "runtime.rollback.requested":
       return { type: "rollback.requested", rollbackPrompt: event.rollbackPrompt };
-    case "runtime.session.started":
     case "runtime.error":
+      return { type: "runtime.error", message: event.message };
+    case "runtime.session.started":
       return undefined;
   }
 };

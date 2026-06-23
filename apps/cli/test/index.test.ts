@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { AuditStore } from "@opsforge/audit";
 import type { HostFacts } from "@opsforge/executor-base";
 import type { Plan } from "@opsforge/dsl";
+import { PlannerValidationError } from "@opsforge/planner";
 import { formatNoTtyFallback, main, shouldLaunchTui } from "../src/index";
 import { createTuiRuntimeActionHandler } from "../src/tui-runtime";
 
@@ -107,6 +108,27 @@ describe("createTuiRuntimeActionHandler", () => {
     const events = await handler({ type: "submit.prompt", prompt: "install nginx" }) ?? [];
 
     expect(events.map((event) => event.type)).toEqual(["thinking.delta", "plan.ready", "execution.finished", "rollback.requested"]);
+  });
+
+  it("maps invalid provider plans to a friendly runtime error event", async () => {
+    const handler = await createTuiRuntimeActionHandler({
+      facts: linuxFacts,
+      provider: {
+        name: "bad-provider",
+        buildPlan: async () => {
+          throw new PlannerValidationError("Required; Invalid discriminator value. Expected 'os-detect'");
+        },
+      },
+    });
+
+    const events = await handler({ type: "submit.prompt", prompt: "hi" }) ?? [];
+
+    expect(events).toEqual([
+      {
+        type: "runtime.error",
+        message: "Provider returned invalid OpsForge Plan DSL. Try a concrete local-ops task, or switch models/provider.",
+      },
+    ]);
   });
 
   it("maps rollback actions through an injected rollback callback", async () => {

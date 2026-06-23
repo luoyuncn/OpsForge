@@ -102,6 +102,7 @@ export interface TuiStatus {
   auditHistory?: TuiAuditHistory;
   auditDetail?: AuditRunReport;
   thinkingText?: string;
+  errorText?: string;
   inputDraft?: string;
   lastSubmittedPrompt?: string;
 }
@@ -119,6 +120,7 @@ export interface TuiLaunchOptions {
   auditHistory?: TuiAuditHistory;
   auditDetail?: AuditRunReport;
   thinkingText?: string;
+  errorText?: string;
   inputDraft?: string;
   lastSubmittedPrompt?: string;
 }
@@ -136,6 +138,7 @@ export const createTuiStatus = (options: TuiLaunchOptions): TuiStatus => ({
   auditHistory: options.auditHistory,
   auditDetail: options.auditDetail,
   thinkingText: options.thinkingText,
+  errorText: options.errorText,
   inputDraft: options.inputDraft,
   lastSubmittedPrompt: options.lastSubmittedPrompt,
 });
@@ -163,6 +166,7 @@ const providerConfigured = (provider: string): boolean =>
   provider !== "未配置" && provider.toLowerCase() !== "unconfigured";
 
 const formatStatusLine = (status: TuiStatus): string => {
+  if (status.errorText) return `Error: ${truncateText(status.errorText)}`;
   if (status.thinkingText) return `Thinking: ${truncateText(status.thinkingText)}`;
   if (!providerConfigured(status.provider)) return "Ready: configure a provider before running live tasks.";
   if (status.planCard || status.timeline) return "Ready: review the current run state below.";
@@ -254,9 +258,10 @@ const Panel = ({ title, children, width, marginTop = 0 }: PanelProps): React.Rea
 
 const StatusView = ({ status }: TuiAppProps): React.ReactElement => {
   const needsProvider = !providerConfigured(status.provider);
+  const hasError = Boolean(status.errorText);
   return (
     <Panel title="Status" width={TUI_WIDTH} marginTop={1}>
-      <Text color={needsProvider ? "yellow" : "green"}>{formatStatusLine(status)}</Text>
+      <Text color={hasError ? "red" : needsProvider ? "yellow" : "green"}>{formatStatusLine(status)}</Text>
       <Text color="gray">Flow: plan - approve - execute - verify - audit - rollback</Text>
     </Panel>
   );

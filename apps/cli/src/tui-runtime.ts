@@ -3,7 +3,7 @@ import { loadConfigFile, type OpsForgeConfig } from "@opsforge/config";
 import type { Plan } from "@opsforge/dsl";
 import type { HostFacts } from "@opsforge/executor-base";
 import { createRuntimeActionController, type RuntimeEvent } from "@opsforge/pi-runtime";
-import { buildPlanFromPrompt, type PlanProvider } from "@opsforge/planner";
+import { buildPlanFromPrompt, PlannerValidationError, type PlanProvider } from "@opsforge/planner";
 import { runtimeEventToTuiEvent, type TuiActionHandler, type TuiEvent } from "@opsforge/tui";
 import { executeParsedPlan, executeRollbackPlan, parseRiskMax, type ApplyResult, type ExecutePlanDeps } from "./commands/apply";
 import { resolvePlanProvider, type PlanProviderResolver } from "./provider";
@@ -27,10 +27,17 @@ const runtimeEventsToTuiEvents = (events: readonly RuntimeEvent[]): TuiEvent[] =
     return tuiEvent ? [tuiEvent] : [];
   });
 
+const formatRuntimeError = (error: unknown): string => {
+  if (error instanceof PlannerValidationError) {
+    return "Provider returned invalid OpsForge Plan DSL. Try a concrete local-ops task, or switch models/provider.";
+  }
+  return `Runtime error: ${error instanceof Error ? error.message : String(error)}`;
+};
+
 const errorToTuiEvent = (error: unknown): TuiEvent[] => [
   {
-    type: "thinking.delta",
-    text: `Runtime error: ${error instanceof Error ? error.message : String(error)}`,
+    type: "runtime.error",
+    message: formatRuntimeError(error),
   },
 ];
 

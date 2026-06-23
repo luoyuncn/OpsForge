@@ -36,6 +36,7 @@ export interface TuiState {
 
 export type TuiEvent =
   | { type: "thinking.delta"; text: string }
+  | { type: "runtime.error"; message: string }
   | { type: "input.changed"; draft: string }
   | { type: "input.submitted" }
   | { type: "plan.ready"; plan: Plan }
@@ -66,9 +67,15 @@ export const reduceTuiEvent = (state: TuiState, event: TuiEvent): TuiState => {
       return {
         ...state,
         thinking: { text },
-        status: { ...state.status, thinkingText: text },
+        status: { ...state.status, thinkingText: text, errorText: undefined },
       };
     }
+    case "runtime.error":
+      return {
+        ...state,
+        thinking: { text: "" },
+        status: { ...state.status, thinkingText: undefined, errorText: event.message },
+      };
     case "input.changed":
       return {
         ...state,
@@ -81,7 +88,13 @@ export const reduceTuiEvent = (state: TuiState, event: TuiEvent): TuiState => {
         ...state,
         input: { draft: "", lastSubmitted: submitted },
         thinking: { text: "" },
-        status: { ...state.status, inputDraft: "", lastSubmittedPrompt: submitted, thinkingText: undefined },
+        status: {
+          ...state.status,
+          inputDraft: "",
+          lastSubmittedPrompt: submitted,
+          thinkingText: undefined,
+          errorText: undefined,
+        },
       };
     }
     case "plan.ready":
@@ -121,6 +134,7 @@ export const reduceTuiEvents = (state: TuiState, events: readonly TuiEvent[]): T
   events.reduce((current, event) => reduceTuiEvent(current, event), state);
 
 export const formatTuiStateSnapshot = (state: TuiState): string => [
+  state.status.errorText ? `Error: ${state.status.errorText}` : undefined,
   state.status.thinkingText ? `Thinking: ${state.status.thinkingText}` : undefined,
   state.status.lastSubmittedPrompt ? `Last prompt: ${state.status.lastSubmittedPrompt}` : undefined,
   `Ask Forge > ${state.status.inputDraft ?? ""}`.trimEnd(),
