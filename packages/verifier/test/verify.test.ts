@@ -20,8 +20,83 @@ describe("verifyPlan", () => {
     expect(results[0].ok).toBe(true);
   });
 
-  it("fails unsupported verification types with a useful message", async () => {
-    const results = await verifyPlan([{ type: "service-status", name: "nginx", expect: "active" }], {});
-    expect(results[0]).toMatchObject({ ok: false, message: "unsupported verification: service-status" });
+  it("verifies package-version with optional expected version", async () => {
+    const results = await verifyPlan([{ type: "package-version", name: "nginx", expect: "1.24.0" }], {
+      getPackageVersion: async (name) => (name === "nginx" ? "1.24.0" : undefined),
+    });
+
+    expect(results[0]).toMatchObject({ ok: true, message: "package nginx version 1.24.0" });
+  });
+
+  it("fails package-version when installed version differs", async () => {
+    const results = await verifyPlan([{ type: "package-version", name: "nginx", expect: "1.24.0" }], {
+      getPackageVersion: async () => "1.23.0",
+    });
+
+    expect(results[0]).toMatchObject({ ok: false, message: "package nginx version 1.23.0 did not match 1.24.0" });
+  });
+
+  it("verifies service-status against the expected status", async () => {
+    const results = await verifyPlan([{ type: "service-status", name: "nginx", expect: "active" }], {
+      getServiceStatus: async () => "active",
+    });
+
+    expect(results[0]).toMatchObject({ ok: true, message: "service nginx status active" });
+  });
+
+  it("fails service-status when actual status differs", async () => {
+    const results = await verifyPlan([{ type: "service-status", name: "nginx", expect: "active" }], {
+      getServiceStatus: async () => "stopped",
+    });
+
+    expect(results[0]).toMatchObject({ ok: false, message: "service nginx status stopped did not match active" });
+  });
+
+  it("verifies port-open using an injected port checker", async () => {
+    const results = await verifyPlan([{ type: "port-open", port: 8080 }], {
+      isPortOpen: async (port) => port === 8080,
+    });
+
+    expect(results[0]).toMatchObject({ ok: true, message: "port 8080 is open" });
+  });
+
+  it("fails port-open when injected checker reports closed", async () => {
+    const results = await verifyPlan([{ type: "port-open", port: 8080 }], {
+      isPortOpen: async () => false,
+    });
+
+    expect(results[0]).toMatchObject({ ok: false, message: "port 8080 is closed" });
+  });
+
+  it("verifies process-alive using an injected process checker", async () => {
+    const results = await verifyPlan([{ type: "process-alive", name: "nginx" }], {
+      isProcessAlive: async (name) => name === "nginx",
+    });
+
+    expect(results[0]).toMatchObject({ ok: true, message: "process nginx is alive" });
+  });
+
+  it("fails process-alive when injected checker reports missing process", async () => {
+    const results = await verifyPlan([{ type: "process-alive", name: "nginx" }], {
+      isProcessAlive: async () => false,
+    });
+
+    expect(results[0]).toMatchObject({ ok: false, message: "process nginx is not alive" });
+  });
+
+  it("fails host-specific verification types when required dependencies are missing", async () => {
+    const results = await verifyPlan([
+      { type: "package-version", name: "nginx" },
+      { type: "service-status", name: "nginx", expect: "active" },
+      { type: "port-open", port: 8080 },
+      { type: "process-alive", name: "nginx" },
+    ], {});
+
+    expect(results.map((result) => result.message)).toEqual([
+      "missing getPackageVersion dependency",
+      "missing getServiceStatus dependency",
+      "missing isPortOpen dependency",
+      "missing isProcessAlive dependency",
+    ]);
   });
 });

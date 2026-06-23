@@ -22,6 +22,7 @@ Implemented plans:
 - Plan 8: `docs/superpowers/plans/2026-06-23-opsforge-plan-8-rollback-command.md`
 - Plan 9: `docs/superpowers/plans/2026-06-23-opsforge-plan-9-verify-command.md`
 - Plan 10: `docs/superpowers/plans/2026-06-23-opsforge-plan-10-auto-rollback.md`
+- Plan 11: `docs/superpowers/plans/2026-06-23-opsforge-plan-11-verifier-coverage.md`
 
 ## Delivered In Plan 1
 
@@ -171,6 +172,13 @@ Implemented plans:
   - `opsforge run "<NL>" --auto-rollback` forwards the same option through the natural-language flow.
   - Human-readable apply/run output now shows `Rollback: not needed`, `recommended`, `unavailable`, or `auto-executed`.
 
+## Delivered In Plan 11
+
+- `@opsforge/verifier`
+  - Supports `package-version`, `service-status`, `port-open`, and `process-alive` through injected host-check dependencies.
+  - Missing host-check dependencies fail explicitly instead of passing silently.
+  - Verifier unit tests now cover all Verification variants in the current DSL.
+
 ## Design Alignment Check
 
 | Spec Area | Status | Evidence | Notes |
@@ -184,7 +192,7 @@ Implemented plans:
 | §6 Planner/provider layer | Partial | `packages/planner`, `packages/config`, `apps/cli/src/provider.ts` | Provider boundary, DSL validation, mock provider, persistent provider config, and OpenAI-compatible adapter exist. Anthropic/Google/Pi adapters, JSON retry/tool-call retry loops, model capability checks, and Pi sessions remain. |
 | §7.2 CLI mode | Partial | `apps/cli/src/commands` | `doctor`, `plan`, `plan --out`, `run`, `apply`, `verify`, `rollback`, `config provider/show`, and `audit ls/show` exist. `apply` and `run` support `--auto-rollback`. |
 | §8 Audit | Partial | `packages/audit` | SQLite event store, stored Plan JSON, and stdout/stderr artifacts exist. Rich reports, retention/export, rollback audit views, and TUI timeline consumption remain. |
-| §11 Tests | Partial | package tests | Unit tests cover deterministic components and do not mutate the host. |
+| §11 Tests | Partial | package tests | Unit tests cover deterministic components, all current verifier variants, and do not mutate the host. |
 
 ## Known Gaps
 
@@ -193,6 +201,7 @@ Implemented plans:
 - TUI primary entry is not implemented; bare `opsforge` still prints a placeholder.
 - TUI inline rollback choice after failure is not implemented.
 - Verification replay is manual only; no scheduled or automatic verification loop exists yet.
+- Real OS-specific default verifier probes are not implemented; host-specific verifier checks currently require injected dependencies.
 - Rollback reporting is basic and does not yet provide rich rollback views in audit output.
 - Audit retention/export and richer report generation are not implemented.
 - TUI timeline consumption of audit history is not implemented.
@@ -204,9 +213,9 @@ Implemented plans:
 
 ## Next Plan Recommendation
 
-Plan 11 should focus on either:
+Plan 12 should focus on either:
 
-1. expanding verifier coverage for service/package/port checks with real host dependencies, or
+1. adding real OS-specific verifier probes for package/service/port/process checks, or
 2. adding richer audit display for rollback and verification replay.
 
-The safer next slice is expanding verifier coverage because rollback orchestration now depends on verification quality to decide when rollback is needed.
+The safer next slice is real OS-specific verifier probes because the verifier API now supports all current DSL verification variants.
