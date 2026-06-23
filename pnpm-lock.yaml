@@ -229,6 +229,9 @@ importers:
       '@opsforge/dsl':
         specifier: workspace:*
         version: link:../dsl
+      '@opsforge/policy':
+        specifier: workspace:*
+        version: link:../policy
     devDependencies:
       '@types/node':
         specifier: ^22.7.0

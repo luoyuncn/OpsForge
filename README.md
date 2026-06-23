@@ -25,6 +25,7 @@ OpsForge is now being built plan-by-plan on `main`.
 - Plan 18 TUI event and input state: `docs/superpowers/plans/2026-06-23-opsforge-plan-18-tui-event-input-state.md`
 - Plan 19 Pi runtime event bridge: `docs/superpowers/plans/2026-06-23-opsforge-plan-19-pi-runtime-event-bridge.md`
 - Plan 20 TUI keyboard session controls: `docs/superpowers/plans/2026-06-23-opsforge-plan-20-tui-keyboard-session-controls.md`
+- Plan 21 runtime action controller: `docs/superpowers/plans/2026-06-23-opsforge-plan-21-runtime-action-controller.md`
 - Current implementation status and design alignment: `docs/implementation-status.md`
 - Checked-in Plan schema artifact: `schemas/plan.schema.json`
 

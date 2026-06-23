@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ExecutePlanResult } from "@opsforge/core";
 import type { Plan } from "@opsforge/dsl";
 import {
+  createRuntimeActionController,
   createRuntimeSessionStatus,
   formatRuntimeEventSummary,
   normalizeRuntimeEvent,
@@ -74,5 +75,84 @@ describe("normalizeRuntimeEvent", () => {
       runId: "run_plan_nginx",
       rollback: execution.rollback,
     } })).toBe("rollback: run_plan_nginx rollback recommended after verification-failed");
+  });
+});
+
+describe("createRuntimeActionController", () => {
+  it("turns prompt submissions into thinking and plan events", async () => {
+    const controller = createRuntimeActionController({
+      buildPlan: async () => plan,
+    });
+
+    const events = await controller.handle({ type: "submit.prompt", prompt: "install nginx" });
+
+    expect(events.map((event) => event.type)).toEqual(["runtime.thinking.delta", "runtime.plan.ready"]);
+  });
+
+  it("pauses high-risk plans as approval requests instead of executing them", async () => {
+    const highRiskPlan: Plan = { ...plan, risk: "L3", steps: [{ type: "shell", cmd: "echo guarded" }] };
+    let executed = false;
+    const controller = createRuntimeActionController({
+      buildPlan: async () => highRiskPlan,
+      executePlan: async () => {
+        executed = true;
+        return execution;
+      },
+    });
+
+    const events = await controller.handle({ type: "submit.prompt", prompt: "run guarded command" });
+
+    expect(executed).toBe(false);
+    expect(events.at(-1)).toMatchObject({
+      type: "runtime.approval.requested",
+      approval: { planId: "plan_nginx", risk: "L3" },
+    });
+  });
+
+  it("auto-executes low-risk plans when an executor callback is available", async () => {
+    const controller = createRuntimeActionController({
+      buildPlan: async () => plan,
+      executePlan: async () => execution,
+    });
+
+    const events = await controller.handle({ type: "submit.prompt", prompt: "install nginx" });
+
+    expect(events.map((event) => event.type)).toContain("runtime.execution.finished");
+  });
+
+  it("resumes execution after approval", async () => {
+    const highRiskPlan: Plan = { ...plan, risk: "L2", steps: [{ type: "file-write", path: "/etc/example", content: "ok" }] };
+    const controller = createRuntimeActionController({
+      buildPlan: async () => highRiskPlan,
+      executePlan: async () => execution,
+    });
+    await controller.handle({ type: "submit.prompt", prompt: "write config" });
+
+    const events = await controller.handle({ type: "approval.approve", planId: "plan_nginx", reason: "needed" });
+
+    expect(events.map((event) => event.type)).toEqual(["runtime.thinking.delta", "runtime.execution.finished"]);
+  });
+
+  it("calls injected rollback handler for rollback actions", async () => {
+    const controller = createRuntimeActionController({
+      buildPlan: async () => plan,
+      rollbackRun: async (runId) => ({ ...execution, runId }),
+    });
+
+    const events = await controller.handle({ type: "rollback.run", runId: "run_plan_nginx" });
+
+    expect(events).toMatchObject([{ type: "runtime.thinking.delta" }, { type: "runtime.execution.finished" }]);
+    expect(events[1]).toMatchObject({ result: { runId: "run_plan_nginx" } });
+  });
+
+  it("emits recoverable errors when required runtime state or callbacks are missing", async () => {
+    const controller = createRuntimeActionController({
+      buildPlan: async () => plan,
+    });
+
+    await expect(controller.handle({ type: "approval.approve", planId: "missing" }))
+      .resolves.toEqual([{ type: "runtime.error", message: "No pending plan to approve", recoverable: true }]);
+    await expect(controller.handle({ type: "rollback.run", runId: "run_plan_nginx" }))
+      .resolves.toEqual([{ type: "runtime.error", message: "Rollback handler is not configured", recoverable: true }]);
   });
 });

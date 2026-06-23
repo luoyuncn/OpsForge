@@ -1,4 +1,11 @@
 export {
+  createRuntimeActionController,
+  type RuntimeActionController,
+  type RuntimeActionControllerDeps,
+  type RuntimeUserAction,
+} from "./actions";
+
+export {
   createRuntimeSessionStatus,
   formatRuntimeEventSummary,
   normalizeRuntimeEvent,

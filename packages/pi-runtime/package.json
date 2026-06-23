@@ -20,7 +20,8 @@
   },
   "dependencies": {
     "@opsforge/core": "workspace:*",
-    "@opsforge/dsl": "workspace:*"
+    "@opsforge/dsl": "workspace:*",
+    "@opsforge/policy": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.7.0",
