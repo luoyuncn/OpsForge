@@ -6,6 +6,7 @@ export const ProviderConfigSchema = z.object({
   kind: ProviderKindSchema,
   model: z.string().optional(),
   baseUrl: z.string().url().optional(),
+  apiKeyEnv: z.string().optional(),
 });
 
 export const ConfigSchema = z.object({

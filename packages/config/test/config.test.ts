@@ -1,5 +1,8 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it, expect } from "vitest";
-import { loadConfig, resolveProvider } from "../src/index";
+import { loadConfig, loadConfigFile, resolveProvider, writeConfigFile } from "../src/index";
 
 describe("loadConfig", () => {
   it("applies defaults with empty env and no file", () => {
@@ -30,10 +33,49 @@ describe("resolveProvider", () => {
 
   it("uses openai-compatible with base url", () => {
     const p = resolveProvider(undefined, { OPENAI_API_KEY: "x", OPENAI_BASE_URL: "https://api.example.com/v1" });
-    expect(p).toEqual({ kind: "openai-compatible", model: undefined, baseUrl: "https://api.example.com/v1" });
+    expect(p).toEqual({
+      kind: "openai-compatible",
+      model: "gpt-4.1-mini",
+      baseUrl: "https://api.example.com/v1",
+      apiKeyEnv: "OPENAI_API_KEY",
+    });
   });
 
   it("returns undefined when no key is present", () => {
     expect(resolveProvider(undefined, {})).toBeUndefined();
+  });
+});
+
+describe("config file persistence", () => {
+  it("writes and loads provider settings from a local config file", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "opsforge-config-"));
+    const configPath = join(dir, "config.json");
+
+    try {
+      await writeConfigFile(configPath, {
+        provider: {
+          kind: "openai-compatible",
+          model: "gpt-4.1-mini",
+          baseUrl: "https://llm.example.com/v1",
+          apiKeyEnv: "OPENAI_API_KEY",
+        },
+        riskMax: "L3",
+        allowShell: false,
+        dbPath: "~/.opsforge/opsforge.db",
+        artifactsDir: "~/.opsforge/artifacts",
+      });
+
+      const loaded = await loadConfigFile(configPath, { env: { OPENAI_API_KEY: "secret" } });
+
+      expect(loaded.provider).toEqual({
+        kind: "openai-compatible",
+        model: "gpt-4.1-mini",
+        baseUrl: "https://llm.example.com/v1",
+        apiKeyEnv: "OPENAI_API_KEY",
+      });
+      expect(loaded.riskMax).toBe("L3");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
