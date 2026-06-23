@@ -6,6 +6,7 @@ import { buildApplyCommand, formatApplyResult, parseRiskMax } from "./commands/a
 import { buildConfigCommand } from "./commands/config";
 import { buildDoctorReport, formatDoctorReport } from "./commands/doctor";
 import { buildPlanCommand } from "./commands/plan";
+import { buildRollbackCommand } from "./commands/rollback";
 import { buildRunCommand } from "./commands/run";
 import { systemWhich } from "./which";
 
@@ -60,6 +61,7 @@ program
 program.addCommand(buildAuditCommand());
 program.addCommand(buildConfigCommand());
 program.addCommand(buildPlanCommand());
+program.addCommand(buildRollbackCommand());
 program.addCommand(buildRunCommand());
 
 if (process.argv.slice(2).length === 0) {

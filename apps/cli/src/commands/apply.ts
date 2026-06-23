@@ -3,7 +3,7 @@ import { readFile as readFileFromDisk } from "node:fs/promises";
 import { promisify } from "node:util";
 import { createSqliteAuditStore, resolveOpsForgePaths, type AuditStore } from "@opsforge/audit";
 import { loadConfig, type OpsForgeConfig } from "@opsforge/config";
-import { executePlan, type ExecutePlanResult } from "@opsforge/core";
+import { executePlan, rollbackPlan, type ExecutePlanResult } from "@opsforge/core";
 import { parsePlan, type Plan, type RiskLevel } from "@opsforge/dsl";
 import type { CommandRunner, HostFacts, RawCommandResult } from "@opsforge/executor-base";
 import { createLinuxExecutor } from "@opsforge/executor-linux";
@@ -84,6 +84,42 @@ export const executeParsedPlan = async (
   try {
     const result = await executePlan({
       plan,
+      executor: executorForFacts(facts),
+      facts,
+      audit,
+      dryRun: options.dryRun,
+      yes: options.yes,
+      riskMax: options.riskMax,
+      allowShell: options.allowShell,
+      runner: deps.runner ?? defaultRunner,
+      verifyDeps: {},
+    });
+
+    for (const [index, stepResult] of result.stepResults.entries()) {
+      audit.recordStepArtifacts(result.runId, index, stepResult.stdout, stepResult.stderr);
+    }
+
+    return { ...result, dryRun: options.dryRun };
+  } finally {
+    if (createdAuditStore) audit.close();
+  }
+};
+
+export const executeRollbackPlan = async (
+  plan: Plan,
+  originalRunId: string,
+  options: ApplyOptions,
+  deps: ExecutePlanDeps = {},
+): Promise<ApplyResult> => {
+  const hostOs = detectOs(deps.platform ?? process.platform);
+  const facts = deps.facts ?? factsFromHost(plan.osFamily ?? hostOs, deps.which ?? systemWhich);
+  const createdAuditStore = deps.auditStore === undefined;
+  const audit = deps.auditStore ?? createSqliteAuditStore(resolveOpsForgePaths(deps.config ?? loadConfig()));
+
+  try {
+    const result = await rollbackPlan({
+      plan,
+      originalRunId,
       executor: executorForFacts(facts),
       facts,
       audit,
