@@ -11,6 +11,7 @@ import {
 } from "./schema";
 
 export * from "./schema";
+export * from "./json-schema";
 
 export type RiskLevel = z.infer<typeof RiskLevelSchema>;
 export type OsFamily = z.infer<typeof OsFamilySchema>;

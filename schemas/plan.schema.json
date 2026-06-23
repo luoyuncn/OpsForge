@@ -1,0 +1,687 @@
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "intent": {
+      "type": "string",
+      "enum": [
+        "install",
+        "upgrade",
+        "configure",
+        "diagnose",
+        "verify",
+        "rollback"
+      ]
+    },
+    "osFamily": {
+      "type": "string",
+      "enum": [
+        "linux",
+        "windows"
+      ]
+    },
+    "packageSpec": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "prechecks": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "os-detect"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "privilege-check"
+              },
+              "requireElevated": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "disk-check"
+              },
+              "minFreeMB": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "type",
+              "minFreeMB"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "command-exists"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "name"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "default": []
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "package-update-cache"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "package-install"
+              },
+              "name": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "package-remove"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "service-enable"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "service-start"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "service-stop"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "service-status"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "file-write"
+              },
+              "path": {
+                "type": "string"
+              },
+              "content": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "path",
+              "content"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "file-template"
+              },
+              "path": {
+                "type": "string"
+              },
+              "template": {
+                "type": "string"
+              },
+              "vars": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "type",
+              "path",
+              "template",
+              "vars"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "shell"
+              },
+              "cmd": {
+                "type": "string"
+              },
+              "shell": {
+                "type": "string",
+                "enum": [
+                  "bash",
+                  "powershell"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "cmd"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "verifications": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "package-version"
+              },
+              "name": {
+                "type": "string"
+              },
+              "expect": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "service-status"
+              },
+              "name": {
+                "type": "string"
+              },
+              "expect": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "running",
+                  "stopped"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "name",
+              "expect"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "port-open"
+              },
+              "port": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "type",
+              "port"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "process-alive"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "file-checksum"
+              },
+              "path": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "path",
+              "sha256"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "smoke-test"
+              },
+              "cmd": {
+                "type": "string"
+              },
+              "expectExit": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "type",
+              "cmd"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "default": []
+    },
+    "rollback": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "package-update-cache"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "package-install"
+              },
+              "name": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "package-remove"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "service-enable"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "service-start"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "service-stop"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "service-status"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "file-write"
+              },
+              "path": {
+                "type": "string"
+              },
+              "content": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "path",
+              "content"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "file-template"
+              },
+              "path": {
+                "type": "string"
+              },
+              "template": {
+                "type": "string"
+              },
+              "vars": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "type",
+              "path",
+              "template",
+              "vars"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "shell"
+              },
+              "cmd": {
+                "type": "string"
+              },
+              "shell": {
+                "type": "string",
+                "enum": [
+                  "bash",
+                  "powershell"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "cmd"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "default": []
+    },
+    "risk": {
+      "type": "string",
+      "enum": [
+        "L0",
+        "L1",
+        "L2",
+        "L3"
+      ]
+    },
+    "explanation": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "createdAt": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "intent",
+    "steps",
+    "risk",
+    "createdAt"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.opsforge.local/plan.schema.json",
+  "title": "OpsForge Plan"
+}
