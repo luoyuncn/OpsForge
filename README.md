@@ -23,6 +23,7 @@ OpsForge is now being built plan-by-plan on `main`.
 - Plan 16 TUI execution timeline: `docs/superpowers/plans/2026-06-23-opsforge-plan-16-tui-execution-timeline.md`
 - Plan 17 TUI inline approval and rollback prompts: `docs/superpowers/plans/2026-06-23-opsforge-plan-17-tui-inline-approval-rollback-prompts.md`
 - Plan 18 TUI event and input state: `docs/superpowers/plans/2026-06-23-opsforge-plan-18-tui-event-input-state.md`
+- Plan 19 Pi runtime event bridge: `docs/superpowers/plans/2026-06-23-opsforge-plan-19-pi-runtime-event-bridge.md`
 - Current implementation status and design alignment: `docs/implementation-status.md`
 - Checked-in Plan schema artifact: `schemas/plan.schema.json`
 

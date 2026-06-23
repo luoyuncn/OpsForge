@@ -1,5 +1,5 @@
 {
-  "name": "@opsforge/tui",
+  "name": "@opsforge/pi-runtime",
   "version": "0.0.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -14,23 +14,16 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/index.tsx --format esm --dts --clean",
+    "build": "tsup src/index.ts --format esm --dts --clean",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@opsforge/core": "workspace:*",
-    "@opsforge/dsl": "workspace:*",
-    "@opsforge/executor-base": "workspace:*",
-    "@opsforge/executor-linux": "workspace:*",
-    "@opsforge/executor-windows": "workspace:*",
-    "@opsforge/pi-runtime": "workspace:*",
-    "ink": "^5.0.1",
-    "react": "^18.3.1"
+    "@opsforge/dsl": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.7.0",
-    "@types/react": "^18.3.12",
     "tsup": "^8.3.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"

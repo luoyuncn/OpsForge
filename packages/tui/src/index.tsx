@@ -35,6 +35,10 @@ export {
 } from "./state";
 
 export {
+  runtimeEventToTuiEvent,
+} from "./runtime-adapter";
+
+export {
   createTuiPlanCard,
   formatPlanCardSnapshot,
   type TuiCommandPreview,

@@ -17,6 +17,7 @@ import {
   formatTuiSnapshot,
   reduceTuiEvent,
 } from "../src/index";
+import { runtimeEventToTuiEvent } from "../src/runtime-adapter";
 
 const linuxFacts: HostFacts = {
   osFamily: "linux",
@@ -476,5 +477,63 @@ describe("formatTuiStateSnapshot", () => {
     expect(snapshot).toContain("Thinking: Planning safely.");
     expect(snapshot).toContain("Ask Forge > install nginx");
     expect(snapshot).toContain("Plan: Install nginx");
+  });
+});
+
+describe("runtimeEventToTuiEvent", () => {
+  it("maps runtime thinking, plan, execution, approval, and rollback events into reducer events", () => {
+    const runtimeEvents = [
+      { type: "runtime.thinking.delta" as const, text: "Planning safely." },
+      { type: "runtime.plan.ready" as const, plan: nginxPlan },
+      { type: "runtime.execution.finished" as const, result: nginxExecutionResult },
+      {
+        type: "runtime.approval.requested" as const,
+        approval: {
+          planId: "plan_nginx",
+          title: "Install nginx",
+          risk: "L2" as const,
+          interactive: true,
+        },
+      },
+      {
+        type: "runtime.rollback.requested" as const,
+        rollbackPrompt: {
+          runId: "run_plan_nginx",
+          rollback: {
+            trigger: "step-failed" as const,
+            autoExecuted: false,
+            available: true,
+            reason: "rollback recommended after step-failed",
+            suggestedCommand: "opsforge rollback run_plan_nginx",
+          },
+        },
+      },
+    ];
+
+    let state = createInitialTuiState(createTuiStatus({ facts: linuxFacts, provider: "mock" }));
+    for (const event of runtimeEvents) {
+      const tuiEvent = runtimeEventToTuiEvent(event);
+      if (tuiEvent) state = reduceTuiEvent(state, tuiEvent);
+    }
+
+    expect(formatTuiStateSnapshot(state)).toContain("Thinking: Planning safely.");
+    expect(state.status.planCard?.title).toBe("Install nginx");
+    expect(state.status.timeline?.runId).toBe("run_plan_nginx");
+    expect(state.status.approvalPrompt?.status).toBe("required");
+    expect(state.status.rollbackPrompt?.status).toBe("recommended");
+  });
+
+  it("ignores session and error runtime events until the TUI has dedicated views for them", () => {
+    expect(runtimeEventToTuiEvent({
+      type: "runtime.session.started",
+      status: {
+        sessionId: "session_1",
+        provider: "mock",
+        rawShellToolsEnabled: false,
+        tools: ["inspect_host", "build_plan", "execute_job", "verify_run", "rollback_run"],
+      },
+    })).toBeUndefined();
+    expect(runtimeEventToTuiEvent({ type: "runtime.error", message: "provider failed", recoverable: true }))
+      .toBeUndefined();
   });
 });
