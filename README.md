@@ -1,4 +1,24 @@
 # OpsForge
+
+## Current implementation status
+
+OpsForge is now being built plan-by-plan on `main`.
+
+- Design spec: `docs/superpowers/specs/2026-06-23-opsforge-local-ops-agent-design.md`
+- Plan 1 foundation: `docs/superpowers/plans/2026-06-23-opsforge-plan-1-foundation.md`
+- Plan 2 deterministic pipeline: `docs/superpowers/plans/2026-06-23-opsforge-plan-2-deterministic-pipeline.md`
+- Current implementation status and design alignment: `docs/implementation-status.md`
+
+Useful commands:
+
+```bash
+pnpm build
+pnpm test
+pnpm typecheck
+node apps/cli/dist/index.js doctor
+node apps/cli/dist/index.js apply examples/plan-install-nginx.local.json --dry-run
+```
+
 OpsForge Agent
 下面我直接给你一份**能开工的产品蓝图**：先给可落地的 **monorepo 目录结构 + TypeScript 包拆分方案**，再给完整的 **产品整体设计**，最后给你一个我认为最适合的命名。整个方案默认你以 [Pi](https://pi.dev/) 作为 agent harness 内核，外面包一层你自己的策略、执行、审计和安全体系；这种做法最符合 Pi 的定位，因为 Pi 本身就强调可扩展、可通过 extensions / skills / SDK / RPC 自定义工作流，而不是一个封闭产品。[Source](https://pi.dev/) [Source](https://pi.dev/docs/latest/sdk)
 

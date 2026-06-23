@@ -1,0 +1,23 @@
+{
+  "id": "plan_install_nginx_local",
+  "title": "Install nginx locally",
+  "intent": "install",
+  "steps": [
+    { "type": "package-update-cache" },
+    { "type": "package-install", "name": "nginx" },
+    { "type": "service-enable", "name": "nginx" },
+    { "type": "service-start", "name": "nginx" }
+  ],
+  "verifications": [
+    { "type": "smoke-test", "cmd": "nginx -v", "expectExit": 0 }
+  ],
+  "rollback": [
+    { "type": "service-stop", "name": "nginx" },
+    { "type": "package-remove", "name": "nginx" }
+  ],
+  "risk": "L1",
+  "explanation": [
+    "Installs nginx using the local OS package manager and starts the service."
+  ],
+  "createdAt": "2026-06-23T00:00:00Z"
+}
