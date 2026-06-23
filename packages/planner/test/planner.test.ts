@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildPlanFromPrompt, createMockPlanProvider, PlannerValidationError } from "../src/index";
+import {
+  buildPlanFromPrompt,
+  createMockPlanProvider,
+  createOpenAICompatiblePlanProvider,
+  OpenAICompatibleProviderError,
+  PlannerValidationError,
+} from "../src/index";
 
 describe("buildPlanFromPrompt", () => {
   it("returns a schema-valid install plan from the mock provider", async () => {
@@ -34,5 +40,65 @@ describe("buildPlanFromPrompt", () => {
         planId: () => "plan_bad",
       }),
     ).rejects.toBeInstanceOf(PlannerValidationError);
+  });
+});
+
+describe("createOpenAICompatiblePlanProvider", () => {
+  it("requests a JSON plan from an OpenAI-compatible chat completions endpoint", async () => {
+    const requests: Array<{ url: string; init: RequestInit & { headers: Record<string, string> } }> = [];
+    const provider = createOpenAICompatiblePlanProvider({
+      apiKey: "test-key",
+      model: "gpt-4.1-mini",
+      baseUrl: "https://llm.example.com/v1",
+      fetch: async (url, init) => {
+        requests.push({ url: String(url), init: init as RequestInit & { headers: Record<string, string> } });
+        return new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    title: "Install nginx",
+                    intent: "install",
+                    steps: [{ type: "package-install", name: "nginx" }],
+                    risk: "L1",
+                  }),
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      },
+    });
+
+    const plan = await buildPlanFromPrompt({
+      prompt: "install nginx",
+      provider,
+      planId: () => "plan_ai_1",
+      now: () => "2026-06-23T00:00:00Z",
+    });
+
+    expect(plan.id).toBe("plan_ai_1");
+    expect(plan.steps[0]).toEqual({ type: "package-install", name: "nginx" });
+    expect(requests[0].url).toBe("https://llm.example.com/v1/chat/completions");
+    expect(requests[0].init.method).toBe("POST");
+    expect(requests[0].init.headers.authorization).toBe("Bearer test-key");
+    const body = JSON.parse(String(requests[0].init.body));
+    expect(body.model).toBe("gpt-4.1-mini");
+    expect(body.temperature).toBe(0);
+    expect(body.response_format).toEqual({ type: "json_object" });
+    expect(body.messages.at(-1).content).toContain("install nginx");
+  });
+
+  it("throws a typed error for non-2xx responses", async () => {
+    const provider = createOpenAICompatiblePlanProvider({
+      apiKey: "test-key",
+      model: "gpt-4.1-mini",
+      baseUrl: "https://llm.example.com/v1/",
+      fetch: async () => new Response("bad gateway", { status: 502 }),
+    });
+
+    await expect(provider.buildPlan({ prompt: "install nginx" })).rejects.toBeInstanceOf(OpenAICompatibleProviderError);
   });
 });
