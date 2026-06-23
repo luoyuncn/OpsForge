@@ -17,6 +17,7 @@ Implemented plans:
 - Plan 3: `docs/superpowers/plans/2026-06-23-opsforge-plan-3-audit-persistence.md`
 - Plan 4: `docs/superpowers/plans/2026-06-23-opsforge-plan-4-planner-provider-scaffold.md`
 - Plan 5: `docs/superpowers/plans/2026-06-23-opsforge-plan-5-json-schema-plan-output.md`
+- Plan 6: `docs/superpowers/plans/2026-06-23-opsforge-plan-6-cli-run-flow.md`
 
 ## Delivered In Plan 1
 
@@ -100,18 +101,26 @@ Implemented plans:
   - Saved plan files can be consumed by `opsforge apply <file> --dry-run`.
   - Plan file writing remains non-mutating with respect to host operations.
 
+## Delivered In Plan 6
+
+- `@opsforge/cli`
+  - `opsforge run "<NL>"` generates a Plan and feeds it into the same gated execution helper used by `apply`.
+  - `opsforge run "<NL>" --dry-run` compiles and guards commands without executing host mutation commands.
+  - `opsforge run "<NL>" --dry-run --json` emits both the generated Plan and execution result.
+  - `apply` now delegates parsed Plan execution through `executeParsedPlan()`, keeping file-based and NL-based flows aligned.
+
 ## Design Alignment Check
 
 | Spec Area | Status | Evidence | Notes |
 |---|---:|---|---|
 | §3 DSL | Partial | `packages/dsl`, `schemas/plan.schema.json` | Core schema and Plan JSON Schema export exist. Job/approval/inventory/audit schema artifacts remain. |
-| §4 Core pipeline | Partial | `packages/core/src/execute.ts` | Deterministic spine exists; rollback orchestration is not implemented yet. |
+| §4 Core pipeline | Partial | `packages/core/src/execute.ts`, `apps/cli/src/commands/run.ts` | Deterministic spine exists and is now reachable from NL via `run`; rollback orchestration is not implemented yet. |
 | §4.1 Executor abstraction | Partial | `packages/executor-base` | Interfaces and injectable runner exist. Real host detection is still shallow. |
 | §4.2 Linux executor | Partial | `packages/executor-linux` | Compile layer exists for apt/dnf/yum and systemd. Real safe file writing needs a later pass. |
 | §4.3 Windows executor | Partial | `packages/executor-windows` | Compile layer exists for winget/choco and services. UAC/admin detection remains open. |
 | §5 Policy and guard | Partial | `packages/policy` | Deterministic classifier/gate/guards exist. More rules and config knobs are needed. |
 | §6 Planner/provider layer | Partial | `packages/planner` | Provider boundary, DSL validation, and mock provider exist. Real OpenAI/Anthropic/Google/Pi adapters, JSON retry, and Pi sessions remain. |
-| §7.2 CLI mode | Partial | `apps/cli/src/commands` | `doctor`, `plan`, `plan --out`, `apply`, and `audit ls/show` exist. `run/verify/rollback/config` remain. |
+| §7.2 CLI mode | Partial | `apps/cli/src/commands` | `doctor`, `plan`, `plan --out`, `run`, `apply`, and `audit ls/show` exist. `verify/rollback/config` remain. |
 | §8 Audit | Partial | `packages/audit` | SQLite event store and stdout/stderr artifacts exist. Rich reports, retention/export, rollback audit views, and TUI timeline consumption remain. |
 | §11 Tests | Partial | package tests | Unit tests cover deterministic components and do not mutate the host. |
 
@@ -121,7 +130,7 @@ Implemented plans:
 - Planner JSON-mode retry/tool-call retry loops are not implemented.
 - TUI primary entry is not implemented; bare `opsforge` still prints a placeholder.
 - Rollback orchestration and CLI `rollback` are not implemented.
-- CLI `run`, `verify`, and `config` subcommands are not implemented.
+- CLI `verify` and `config` subcommands are not implemented.
 - Audit retention/export and richer report generation are not implemented.
 - TUI timeline consumption of audit history is not implemented.
 - Provider configuration commands, real provider adapters, and model capability checks are not implemented.
@@ -132,9 +141,9 @@ Implemented plans:
 
 ## Next Plan Recommendation
 
-Plan 6 should focus on either:
+Plan 7 should focus on either:
 
 1. provider configuration commands and a real OpenAI-compatible planner adapter with mocked HTTP tests, or
-2. CLI `run "<NL>"` as a composed `plan -> gate -> apply` flow using the existing mock planner and dry-run-safe execution path.
+2. rollback orchestration plus CLI `rollback <run_id>` using existing audit/run records.
 
-The safer next slice is CLI `run "<NL>" --dry-run` because it connects existing planner and executor pieces without introducing live LLM credentials yet.
+The safer next slice is provider configuration plus a mocked OpenAI-compatible adapter because `run` now exposes the full NL path while still using the deterministic mock provider.

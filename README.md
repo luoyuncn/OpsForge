@@ -10,6 +10,7 @@ OpsForge is now being built plan-by-plan on `main`.
 - Plan 3 audit persistence: `docs/superpowers/plans/2026-06-23-opsforge-plan-3-audit-persistence.md`
 - Plan 4 planner scaffold: `docs/superpowers/plans/2026-06-23-opsforge-plan-4-planner-provider-scaffold.md`
 - Plan 5 schema and plan output: `docs/superpowers/plans/2026-06-23-opsforge-plan-5-json-schema-plan-output.md`
+- Plan 6 CLI run flow: `docs/superpowers/plans/2026-06-23-opsforge-plan-6-cli-run-flow.md`
 - Current implementation status and design alignment: `docs/implementation-status.md`
 - Checked-in Plan schema artifact: `schemas/plan.schema.json`
 
@@ -23,6 +24,8 @@ node apps/cli/dist/index.js doctor
 node apps/cli/dist/index.js plan "install nginx"
 node apps/cli/dist/index.js plan "install nginx" --json
 node apps/cli/dist/index.js plan "install nginx" --out .opsforge-tmp/plan-nginx.json
+node apps/cli/dist/index.js run "install nginx" --dry-run
+node apps/cli/dist/index.js run "install nginx" --dry-run --json
 node apps/cli/dist/index.js apply .opsforge-tmp/plan-nginx.json --dry-run
 node apps/cli/dist/index.js apply examples/plan-install-nginx.local.json --dry-run
 node apps/cli/dist/index.js audit ls
