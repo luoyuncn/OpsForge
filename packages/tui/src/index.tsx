@@ -148,67 +148,170 @@ const formatDistro = (facts: HostFacts): string => {
 const formatPackageManagers = (facts: HostFacts): string =>
   facts.packageManagers.length ? facts.packageManagers.join(", ") : "none";
 
+const TUI_WIDTH = 100;
+const SUMMARY_WIDTH = 49;
+const STATUS_TEXT_LIMIT = 118;
+
+const normalizeText = (value: string): string => value.replace(/\s+/g, " ").trim();
+
+const truncateText = (value: string, limit = STATUS_TEXT_LIMIT): string => {
+  const normalized = normalizeText(value);
+  return normalized.length > limit ? `${normalized.slice(0, limit - 3)}...` : normalized;
+};
+
+const providerConfigured = (provider: string): boolean =>
+  provider !== "未配置" && provider.toLowerCase() !== "unconfigured";
+
+const formatStatusLine = (status: TuiStatus): string => {
+  if (status.thinkingText) return `Thinking: ${truncateText(status.thinkingText)}`;
+  if (!providerConfigured(status.provider)) return "Ready: configure a provider before running live tasks.";
+  if (status.planCard || status.timeline) return "Ready: review the current run state below.";
+  return "Ready: type a local operations task below.";
+};
+
+const workspacePlaceholder = (status: TuiStatus): string =>
+  providerConfigured(status.provider)
+    ? "No active run yet. Submit a task to plan, review, execute, verify, and audit it."
+    : "Provider is not configured yet. Run `opsforge config provider ...` in another shell, then restart the TUI.";
+
+const hasWorkspaceContent = (status: TuiStatus): boolean =>
+  Boolean(
+    status.planCard
+      || status.timeline
+      || status.approvalPrompt
+      || status.rollbackPrompt
+      || status.auditHistory
+      || status.auditDetail,
+  );
+
+const snapshotSection = (title: string, lines: readonly (string | undefined)[]): string[] => [
+  title,
+  ...lines.filter((line): line is string => Boolean(line)),
+];
+
 export const formatTuiSnapshot = (status: TuiStatus): string => [
-  "Forge",
-  "OpsForge TUI",
-  `OS: ${status.facts.osFamily} ${status.facts.arch}`,
-  `Distro: ${formatDistro(status.facts)}`,
-  `Elevated: ${status.facts.isElevated}`,
-  `Package managers: ${formatPackageManagers(status.facts)}`,
-  `Provider: ${status.provider}`,
-  `Model: ${status.model ?? "default"}`,
-  `Session: ${status.sessionLabel}`,
-  `Audit: ${status.auditLabel}`,
-  status.thinkingText ? `Thinking: ${status.thinkingText}` : undefined,
-  status.lastSubmittedPrompt ? `Last prompt: ${status.lastSubmittedPrompt}` : undefined,
-  status.planCard ? formatPlanCardSnapshot(status.planCard) : "Timeline: waiting for a task",
-  status.timeline ? formatExecutionTimelineSnapshot(status.timeline) : undefined,
-  status.approvalPrompt ? formatApprovalPromptSnapshot(status.approvalPrompt) : undefined,
-  status.rollbackPrompt ? formatRollbackPromptSnapshot(status.rollbackPrompt) : undefined,
-  status.auditHistory ? formatAuditHistorySnapshot(status.auditHistory) : undefined,
-  status.auditDetail ? formatAuditDetailSnapshot(status.auditDetail) : undefined,
-  `Ask Forge > ${status.inputDraft ?? ""}`.trimEnd(),
+  "Forge OpsForge TUI",
+  `Session: ${status.sessionLabel} | Audit: ${status.auditLabel}`,
+  "",
+  ...snapshotSection("Host", [
+    `OS: ${status.facts.osFamily} ${status.facts.arch}`,
+    `Distro: ${formatDistro(status.facts)}`,
+    `Elevated: ${status.facts.isElevated}`,
+    `Package managers: ${formatPackageManagers(status.facts)}`,
+  ]),
+  "",
+  ...snapshotSection("Runtime", [
+    `Provider: ${status.provider}`,
+    `Model: ${status.model ?? "default"}`,
+  ]),
+  "",
+  ...snapshotSection("Status", [
+    formatStatusLine(status),
+  ]),
+  "",
+  ...snapshotSection("Workspace", [
+    status.planCard ? formatPlanCardSnapshot(status.planCard) : undefined,
+    status.timeline ? formatExecutionTimelineSnapshot(status.timeline) : undefined,
+    status.approvalPrompt ? formatApprovalPromptSnapshot(status.approvalPrompt) : undefined,
+    status.rollbackPrompt ? formatRollbackPromptSnapshot(status.rollbackPrompt) : undefined,
+    status.auditHistory ? formatAuditHistorySnapshot(status.auditHistory) : undefined,
+    status.auditDetail ? formatAuditDetailSnapshot(status.auditDetail) : undefined,
+    hasWorkspaceContent(status) ? undefined : workspacePlaceholder(status),
+  ]),
+  "",
+  ...snapshotSection("Prompt", [
+    status.lastSubmittedPrompt ? `Last prompt: ${status.lastSubmittedPrompt}` : undefined,
+    `Ask Forge > ${status.inputDraft ?? ""}`.trimEnd(),
+    "Commands: /history, /audit <n>",
+  ]),
 ].filter((line): line is string => Boolean(line)).join("\n");
 
 export interface TuiAppProps {
   status: TuiStatus;
 }
 
+interface PanelProps {
+  title: string;
+  children: React.ReactNode;
+  width?: number;
+  marginTop?: number;
+}
+
+const Panel = ({ title, children, width, marginTop = 0 }: PanelProps): React.ReactElement => (
+  <Box
+    borderStyle="single"
+    borderColor="gray"
+    flexDirection="column"
+    paddingX={1}
+    paddingY={0}
+    width={width}
+    marginTop={marginTop}
+  >
+    <Text bold color="cyan">{title}</Text>
+    {children}
+  </Box>
+);
+
+const StatusView = ({ status }: TuiAppProps): React.ReactElement => {
+  const needsProvider = !providerConfigured(status.provider);
+  return (
+    <Panel title="Status" width={TUI_WIDTH} marginTop={1}>
+      <Text color={needsProvider ? "yellow" : "green"}>{formatStatusLine(status)}</Text>
+      <Text color="gray">Flow: plan - approve - execute - verify - audit - rollback</Text>
+    </Panel>
+  );
+};
+
+const WorkspaceView = ({ status }: TuiAppProps): React.ReactElement => (
+  <Panel title="Workspace" width={TUI_WIDTH} marginTop={1}>
+    {status.planCard ? <PlanCardView card={status.planCard} /> : null}
+    {status.timeline ? <ExecutionTimelineView timeline={status.timeline} /> : null}
+    {status.approvalPrompt ? <ApprovalPromptView prompt={status.approvalPrompt} /> : null}
+    {status.rollbackPrompt ? <RollbackPromptView prompt={status.rollbackPrompt} /> : null}
+    {status.auditHistory ? <AuditHistoryView history={status.auditHistory} /> : null}
+    {status.auditDetail ? <AuditDetailView report={status.auditDetail} /> : null}
+    {hasWorkspaceContent(status) ? null : (
+      <>
+        <Text>{workspacePlaceholder(status)}</Text>
+        <Text color="gray">Audit commands: /history, /audit &lt;n&gt;</Text>
+      </>
+    )}
+  </Panel>
+);
+
+const PromptView = ({ status }: TuiAppProps): React.ReactElement => (
+  <Panel title="Prompt" width={TUI_WIDTH} marginTop={1}>
+    {status.lastSubmittedPrompt ? <Text color="gray">Last prompt: {status.lastSubmittedPrompt}</Text> : null}
+    <Text color="green">Ask Forge &gt; {status.inputDraft ?? ""}</Text>
+  </Panel>
+);
+
 export const TuiApp = ({ status }: TuiAppProps): React.ReactElement => (
-  <Box flexDirection="column">
-    <Box>
-      <Text bold color="cyan">Forge</Text>
-      <Text> OpsForge TUI</Text>
+  <Box flexDirection="column" width={TUI_WIDTH}>
+    <Box justifyContent="space-between" width={TUI_WIDTH}>
+      <Box>
+        <Text bold color="cyan">Forge</Text>
+        <Text bold> OpsForge</Text>
+      </Box>
+      <Text color="gray">Session {status.sessionLabel} | Audit {status.auditLabel}</Text>
     </Box>
-    <Box marginTop={1} flexDirection="column">
-      <Text>OS: {status.facts.osFamily} {status.facts.arch}</Text>
-      <Text>Distro: {formatDistro(status.facts)}</Text>
-      <Text>Elevated: {String(status.facts.isElevated)}</Text>
-      <Text>Package managers: {formatPackageManagers(status.facts)}</Text>
-      <Text>Provider: {status.provider}</Text>
-      <Text>Model: {status.model ?? "default"}</Text>
+    <Box marginTop={1} flexDirection="row" width={TUI_WIDTH}>
+      <Panel title="Host" width={SUMMARY_WIDTH}>
+        <Text>{status.facts.osFamily} {status.facts.arch}</Text>
+        <Text>Distro: {formatDistro(status.facts)}</Text>
+        <Text>Elevated: {String(status.facts.isElevated)}</Text>
+        <Text>Packages: {formatPackageManagers(status.facts)}</Text>
+      </Panel>
+      <Box width={2} />
+      <Panel title="Runtime" width={SUMMARY_WIDTH}>
+        <Text color={providerConfigured(status.provider) ? "green" : "yellow"}>Provider: {status.provider}</Text>
+        <Text>Model: {status.model ?? "default"}</Text>
+        <Text color="gray">Primary surface: TUI</Text>
+      </Panel>
     </Box>
-    <Box marginTop={1} flexDirection="column">
-      {status.thinkingText ? <Text>Thinking: {status.thinkingText}</Text> : null}
-      {status.planCard ? <PlanCardView card={status.planCard} /> : (
-        <>
-          <Text color="gray">Timeline: waiting for a task</Text>
-          <Text color="gray">Plan card, execution timeline, approvals, and rollback prompts land in the next TUI plans.</Text>
-        </>
-      )}
-      {status.timeline ? <ExecutionTimelineView timeline={status.timeline} /> : null}
-      {status.approvalPrompt ? <ApprovalPromptView prompt={status.approvalPrompt} /> : null}
-      {status.rollbackPrompt ? <RollbackPromptView prompt={status.rollbackPrompt} /> : null}
-      {status.auditHistory ? <AuditHistoryView history={status.auditHistory} /> : null}
-      {status.auditDetail ? <AuditDetailView report={status.auditDetail} /> : null}
-    </Box>
-    <Box marginTop={1}>
-      {status.lastSubmittedPrompt ? <Text color="gray">Last prompt: {status.lastSubmittedPrompt} </Text> : null}
-      <Text color="green">Ask Forge &gt; {status.inputDraft ?? ""}</Text>
-    </Box>
-    <Box marginTop={1}>
-      <Text color="gray">Session: {status.sessionLabel} | Audit: {status.auditLabel}</Text>
-    </Box>
+    <StatusView status={status} />
+    <WorkspaceView status={status} />
+    <PromptView status={status} />
   </Box>
 );
 

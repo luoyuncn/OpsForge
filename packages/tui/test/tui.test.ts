@@ -218,6 +218,31 @@ describe("formatTuiSnapshot", () => {
     expect(snapshot).toContain("Ask Forge > install nginx");
   });
 
+  it("keeps long runtime status readable and separates the prompt area", () => {
+    const repeatedError = Array.from({ length: 4 }, () =>
+      "Runtime error: No provider configured. Run `opsforge config provider ...` first.",
+    ).join("");
+    const snapshot = formatTuiSnapshot(createTuiStatus({
+      facts: {
+        osFamily: "windows",
+        arch: "x64",
+        isElevated: false,
+        packageManagers: ["winget", "choco"],
+      },
+      provider: "未配置",
+      thinkingText: repeatedError,
+      inputDraft: "安装 nginx",
+      lastSubmittedPrompt: "1111",
+    }));
+
+    expect(snapshot).toContain("Status");
+    expect(snapshot).toContain("Runtime error: No provider configured.");
+    expect(snapshot).toContain("Prompt");
+    expect(snapshot).toContain("Last prompt: 1111");
+    expect(snapshot).toContain("Ask Forge > 安装 nginx");
+    expect(Math.max(...snapshot.split("\n").map((line) => line.length))).toBeLessThanOrEqual(140);
+  });
+
   it("renders loaded audit history and opened audit detail", () => {
     const snapshot = formatTuiSnapshot(createTuiStatus({
       facts: linuxFacts,
@@ -485,6 +510,21 @@ describe("reduceTuiEvent", () => {
     expect(submitted.input.draft).toBe("");
     expect(submitted.input.lastSubmitted).toBe("install nginx");
     expect(submitted.status.lastSubmittedPrompt).toBe("install nginx");
+  });
+
+  it("clears stale thinking text when a new prompt is submitted", () => {
+    let state = createInitialTuiState(createTuiStatus({
+      facts: linuxFacts,
+      provider: "mock",
+      thinkingText: "Runtime error: No provider configured.",
+      inputDraft: "retry",
+    }));
+
+    state = reduceTuiEvent(state, { type: "input.submitted" });
+    state = reduceTuiEvent(state, { type: "thinking.delta", text: "Planning safely." });
+
+    expect(state.status.lastSubmittedPrompt).toBe("retry");
+    expect(state.status.thinkingText).toBe("Planning safely.");
   });
 
   it("builds renderable plan, execution, approval, and rollback state from events", () => {

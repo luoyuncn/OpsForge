@@ -80,7 +80,8 @@ export const reduceTuiEvent = (state: TuiState, event: TuiEvent): TuiState => {
       return {
         ...state,
         input: { draft: "", lastSubmitted: submitted },
-        status: { ...state.status, inputDraft: "", lastSubmittedPrompt: submitted },
+        thinking: { text: "" },
+        status: { ...state.status, inputDraft: "", lastSubmittedPrompt: submitted, thinkingText: undefined },
       };
     }
     case "plan.ready":

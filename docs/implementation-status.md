@@ -390,6 +390,14 @@ Implemented plans:
   - Repair prompts include the original user request, schema validation errors, and the previous output.
   - `maxRepairAttempts` lets tests and callers make the retry budget explicit while preserving schema validation as the only success path.
 
+## Delivered In Plan 30
+
+- `@opsforge/tui`
+  - Reworked the live Ink shell into separate Host, Runtime, Status, Workspace, and Prompt panels so prompt input no longer sits in the same visual stream as host facts, errors, and run content.
+  - Compact long runtime/thinking text in the TUI snapshot and live status panel so repeated provider errors do not dominate the screen.
+  - Clear stale thinking/status text on each new prompt submission, preventing repeated `Runtime error` messages from accumulating across retries.
+  - Removed obsolete placeholder copy about future TUI plans from the primary TUI surface.
+
 ## Design Alignment Check
 
 | Spec Area | Status | Evidence | Notes |
@@ -401,7 +409,7 @@ Implemented plans:
 | §4.3 Windows executor | Partial | `packages/executor-windows`, `apps/cli/src/host-facts.ts`, `packages/core/src/execute.ts` | Compile layer exists for winget/choco, services, and stdin-backed file write/template operations. Doctor can detect admin status with `net session`, and core blocks privileged execution when not admin; automatic UAC relaunch remains open. |
 | §5 Policy and guard | Partial | `packages/policy` | Deterministic classifier/gate/guards exist. More rules and config knobs are needed. |
 | §6 Planner/provider layer | Partial | `packages/planner`, `packages/config`, `packages/pi-runtime`, `apps/cli/src/provider.ts`, `apps/cli/src/commands/doctor.ts`, `skills/` | Provider boundary, DSL validation, schema repair retry, mock provider, deterministic skill templates, persistent provider config, OpenAI-compatible adapter, Anthropic adapter, Google adapter, provider capability reporting, typed Pi runtime event bridge, and runtime action controller exist. Real Pi SDK sessions, provider-native raw JSON/tool-call retry loops, and model discovery remain. |
-| §7.1 TUI mode | Partial | `packages/tui`, `packages/tui/src/plan-card.ts`, `packages/tui/src/timeline.ts`, `packages/tui/src/prompts.ts`, `packages/tui/src/state.ts`, `packages/tui/src/runtime-adapter.ts`, `packages/tui/src/controls.ts`, `packages/tui/src/audit-history.ts`, `packages/pi-runtime/src/actions.ts`, `apps/cli/src/index.ts`, `apps/cli/src/tui-runtime.ts`, `packages/planner/src/skill-templates.ts` | `@opsforge/tui` exists, `opsforge` no-arg enters the TUI path in TTY, a deterministic Plan card can render risk/prechecks/steps/compiled command previews/verifications/rollback preview/explanation, a deterministic execution timeline can render step output/exit codes/verification results/rollback recommendations, inline approval/rollback prompt states can render, a pure event/input reducer can drive those views, runtime events can be adapted into TUI events, keyboard input can emit typed prompt/approval/rollback/audit actions, async TUI action handlers can feed returned events back into state, the no-arg CLI entry now wires prompt submission to provider planning plus guarded core execution, stored-audit rollback execution, and stored-audit history/detail loading, and planner skill templates are available through that same prompt path. Real Pi SDK streaming remains. |
+| §7.1 TUI mode | Partial | `packages/tui`, `packages/tui/src/plan-card.ts`, `packages/tui/src/timeline.ts`, `packages/tui/src/prompts.ts`, `packages/tui/src/state.ts`, `packages/tui/src/runtime-adapter.ts`, `packages/tui/src/controls.ts`, `packages/tui/src/audit-history.ts`, `packages/pi-runtime/src/actions.ts`, `apps/cli/src/index.ts`, `apps/cli/src/tui-runtime.ts`, `packages/planner/src/skill-templates.ts` | `@opsforge/tui` exists, `opsforge` no-arg enters the TUI path in TTY, the live shell separates Host/Runtime/Status/Workspace/Prompt panels, long runtime status is compacted, stale thinking text is cleared on new prompt submission, a deterministic Plan card can render risk/prechecks/steps/compiled command previews/verifications/rollback preview/explanation, a deterministic execution timeline can render step output/exit codes/verification results/rollback recommendations, inline approval/rollback prompt states can render, a pure event/input reducer can drive those views, runtime events can be adapted into TUI events, keyboard input can emit typed prompt/approval/rollback/audit actions, async TUI action handlers can feed returned events back into state, the no-arg CLI entry now wires prompt submission to provider planning plus guarded core execution, stored-audit rollback execution, and stored-audit history/detail loading, and planner skill templates are available through that same prompt path. Real Pi SDK streaming remains. |
 | §7.2 CLI mode | Partial | `apps/cli/src/commands` | `doctor`, `plan`, `plan --out`, `run`, `apply`, `verify`, `rollback`, `config provider/show`, `audit ls/show/export` exist. `doctor` now reports richer HostFacts and readiness warnings; `apply` and `run` support `--auto-rollback`; default verification includes read-only host probes. |
 | §8 Audit | Partial | `packages/audit` | SQLite event store, stored Plan JSON, stdout/stderr artifacts, rich reports, JSON report export, rollback audit event summaries, and TUI history/detail consumption exist. Retention/pruning remains. |
 | §11 Tests | Partial | package tests | Unit tests cover deterministic components, all current verifier variants, default verifier probe command generation, local TCP port checks, HostFacts detection, doctor warnings, TUI snapshot rendering, and no-arg TUI entry decisions without mutating the host. |
@@ -426,7 +434,8 @@ The implementation priority is now locked back to the design document's product 
 - Plan 27: Block privileged execution on non-elevated hosts and surface actionable doctor guidance.
 - Plan 28: Add TUI audit history/detail reports and shared CLI export/report formatting.
 - Plan 29: Add provider-neutral planner schema repair retry for invalid DSL output.
-- After Plan 29: remaining work is no longer basic local TUI/control-plane plumbing; it is deeper Pi SDK fidelity and hardening.
+- Plan 30: Polish the live TUI layout and status hygiene so host facts, runtime state, workspace content, and prompt input are separated.
+- After Plan 30: remaining work is no longer basic local TUI/control-plane plumbing; it is deeper Pi SDK fidelity and hardening.
 
 ## Remaining Implementation Estimate
 
@@ -437,7 +446,7 @@ The local TUI-first Phase 1 spine is now implemented through planning, approval,
 - Real Pi planner adapter and real Pi SDK session integration are not implemented.
 - Planner schema repair retry is implemented; provider-native raw JSON/tool-call retry loops are not implemented.
 - Anthropic and Google provider adapters exist, but live model discovery is not implemented.
-- TUI primary entry, deterministic state/rendering, runtime-event adaptation, keyboard action emission, runtime action handling, and no-arg provider/core callback wiring exist.
+- TUI primary entry, separated live panels, deterministic state/rendering, runtime-event adaptation, keyboard action emission, runtime action handling, and no-arg provider/core callback wiring exist.
 - TUI rollback prompt rendering, rollback key actions, no-arg stored audit rollback execution, and browseable audit history/detail reports are wired.
 - Verification replay is manual only; no scheduled or automatic verification loop exists yet.
 - Default verifier probes and HostFacts detection are basic; package-manager edge cases, distro-specific nuance, and automatic sudo/UAC relaunch remain open.
