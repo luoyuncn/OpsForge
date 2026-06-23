@@ -98,6 +98,8 @@ export const executePlan = async (input: ExecutePlanInput): Promise<ExecutePlanR
   }
 
   if (input.dryRun) {
+    input.audit.record({ type: "job.dispatched", at: now(), payload: { runId, planId: input.plan.id } });
+    input.audit.record({ type: "run.dry_run.finished", at: now(), payload: { runId } });
     return {
       runId,
       risk: classified.risk,

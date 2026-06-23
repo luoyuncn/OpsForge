@@ -67,7 +67,13 @@ describe("executePlan", () => {
     expect(result.commands).toHaveLength(1);
     expect(result.stepResults).toEqual([]);
     expect(runnerCalls).toBe(0);
-    expect(audit.events().map((event) => event.type)).toEqual(["plan.created", "plan.classified", "gate.confirmed"]);
+    expect(audit.events().map((event) => event.type)).toEqual([
+      "plan.created",
+      "plan.classified",
+      "gate.confirmed",
+      "job.dispatched",
+      "run.dry_run.finished",
+    ]);
   });
 
   it("denies L2 plans without yes", async () => {

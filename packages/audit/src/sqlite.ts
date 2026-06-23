@@ -107,6 +107,7 @@ const eventRunId = (event: AuditEvent): string | undefined => {
 };
 
 const runStatusFromEvent = (event: AuditEvent): { status: string; endedAt?: string } | undefined => {
+  if (event.type === "run.dry_run.finished") return { status: "dry_run", endedAt: event.at };
   if (event.type === "run.verified") return { status: "completed", endedAt: event.at };
   if (event.type === "run.rollback.started") return { status: "rolling_back" };
   if (event.type === "run.rollback.finished") return { status: "rolled_back", endedAt: event.at };
