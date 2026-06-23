@@ -44,6 +44,9 @@ importers:
       '@opsforge/executor-windows':
         specifier: workspace:*
         version: link:../../packages/executor-windows
+      '@opsforge/planner':
+        specifier: workspace:^
+        version: link:../../packages/planner
       commander:
         specifier: ^12.1.0
         version: 12.1.0

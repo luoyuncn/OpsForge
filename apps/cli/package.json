@@ -6,7 +6,9 @@
     "opsforge": "./dist/index.js",
     "ops": "./dist/index.js"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
@@ -20,6 +22,7 @@
     "@opsforge/executor-base": "workspace:*",
     "@opsforge/executor-linux": "workspace:*",
     "@opsforge/executor-windows": "workspace:*",
+    "@opsforge/planner": "workspace:^",
     "commander": "^12.1.0"
   },
   "devDependencies": {

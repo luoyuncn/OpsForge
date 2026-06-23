@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { buildAuditCommand } from "./commands/audit";
 import { buildApplyCommand, formatApplyResult, parseRiskMax } from "./commands/apply";
 import { buildDoctorReport, formatDoctorReport } from "./commands/doctor";
+import { buildPlanCommand } from "./commands/plan";
 import { systemWhich } from "./which";
 
 const program = new Command();
@@ -43,6 +44,7 @@ program
   });
 
 program.addCommand(buildAuditCommand());
+program.addCommand(buildPlanCommand());
 
 if (process.argv.slice(2).length === 0) {
   console.log(
