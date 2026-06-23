@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Text, render } from "ink";
+import { Box, Text, render, useInput } from "ink";
 import type { ExecutePlanResult } from "@opsforge/core";
 import type { Plan } from "@opsforge/dsl";
 import type { HostFacts } from "@opsforge/executor-base";
@@ -23,11 +23,21 @@ import {
   formatExecutionTimelineSnapshot,
   type TuiExecutionTimeline,
 } from "./timeline";
+import { reduceTuiKeyInput, type TuiUserAction } from "./controls";
+import { createInitialTuiState, type TuiState } from "./state";
+
+export {
+  reduceTuiKeyInput,
+  type TuiKeyInput,
+  type TuiKeyInputResult,
+  type TuiUserAction,
+} from "./controls";
 
 export {
   createInitialTuiState,
   formatTuiStateSnapshot,
   reduceTuiEvent,
+  type TuiControlState,
   type TuiEvent,
   type TuiInputState,
   type TuiState,
@@ -179,6 +189,25 @@ export const TuiApp = ({ status }: TuiAppProps): React.ReactElement => (
   </Box>
 );
 
+export interface TuiInteractiveAppProps {
+  initialStatus: TuiStatus;
+  onAction?: (action: TuiUserAction) => void | Promise<void>;
+}
+
+export const TuiInteractiveApp = ({ initialStatus, onAction }: TuiInteractiveAppProps): React.ReactElement => {
+  const [state, setState] = React.useState<TuiState>(() => createInitialTuiState(initialStatus));
+
+  useInput((input, key) => {
+    setState((current) => {
+      const result = reduceTuiKeyInput(current, input, key);
+      if (result.action) void onAction?.(result.action);
+      return result.state;
+    });
+  });
+
+  return <TuiApp status={state.status} />;
+};
+
 interface PlanCardViewProps {
   card: TuiPlanCard;
 }
@@ -300,5 +329,5 @@ const isTuiStatus = (options: TuiLaunchOptions | TuiStatus): options is TuiStatu
 
 export const runTui = (options: TuiLaunchOptions | TuiStatus): void => {
   const status = isTuiStatus(options) ? options : createTuiStatus(options);
-  render(<TuiApp status={status} />);
+  render(<TuiInteractiveApp initialStatus={status} />);
 };

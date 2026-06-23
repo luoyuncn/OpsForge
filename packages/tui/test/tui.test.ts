@@ -16,6 +16,7 @@ import {
   formatTuiStateSnapshot,
   formatTuiSnapshot,
   reduceTuiEvent,
+  reduceTuiKeyInput,
 } from "../src/index";
 import { runtimeEventToTuiEvent } from "../src/runtime-adapter";
 
@@ -535,5 +536,71 @@ describe("runtimeEventToTuiEvent", () => {
     })).toBeUndefined();
     expect(runtimeEventToTuiEvent({ type: "runtime.error", message: "provider failed", recoverable: true }))
       .toBeUndefined();
+  });
+});
+
+describe("reduceTuiKeyInput", () => {
+  it("edits prompt input and emits submit actions on enter", () => {
+    let state = createInitialTuiState(createTuiStatus({ facts: linuxFacts, provider: "mock" }));
+    let result = reduceTuiKeyInput(state, "i", {});
+    result = reduceTuiKeyInput(result.state, "n", {});
+    result = reduceTuiKeyInput(result.state, "x", {});
+    result = reduceTuiKeyInput(result.state, "", { backspace: true });
+    result = reduceTuiKeyInput(result.state, "", { return: true });
+
+    state = result.state;
+
+    expect(state.input.lastSubmitted).toBe("in");
+    expect(state.status.lastSubmittedPrompt).toBe("in");
+    expect(result.action).toEqual({ type: "submit.prompt", prompt: "in" });
+  });
+
+  it("emits approve and deny actions for L2 approval prompts", () => {
+    let state = createInitialTuiState(createTuiStatus({ facts: linuxFacts, provider: "mock" }));
+    state = reduceTuiEvent(state, {
+      type: "approval.requested",
+      approval: { planId: "plan_config", title: "Update config", risk: "L2", interactive: true },
+    });
+
+    expect(reduceTuiKeyInput(state, "a", {}).action).toEqual({ type: "approval.approve", planId: "plan_config" });
+    expect(reduceTuiKeyInput(state, "d", {}).action).toEqual({ type: "approval.deny", planId: "plan_config" });
+  });
+
+  it("requires L3 approval reason text before emitting approve", () => {
+    let state = createInitialTuiState(createTuiStatus({ facts: linuxFacts, provider: "mock" }));
+    state = reduceTuiEvent(state, {
+      type: "approval.requested",
+      approval: { planId: "plan_shell", title: "Run guarded shell", risk: "L3", interactive: true },
+    });
+
+    let result = reduceTuiKeyInput(state, "", { return: true });
+    expect(result.action).toBeUndefined();
+
+    result = reduceTuiKeyInput(result.state, "r", {});
+    result = reduceTuiKeyInput(result.state, "e", {});
+    result = reduceTuiKeyInput(result.state, "", { return: true });
+
+    expect(result.action).toEqual({ type: "approval.approve", planId: "plan_shell", reason: "re" });
+    expect(result.state.controls.approvalReasonDraft).toBe("");
+  });
+
+  it("emits rollback and skip actions for rollback prompts", () => {
+    let state = createInitialTuiState(createTuiStatus({ facts: linuxFacts, provider: "mock" }));
+    state = reduceTuiEvent(state, {
+      type: "rollback.requested",
+      rollbackPrompt: {
+        runId: "run_plan_nginx",
+        rollback: {
+          trigger: "step-failed",
+          autoExecuted: false,
+          available: true,
+          reason: "rollback recommended after step-failed",
+          suggestedCommand: "opsforge rollback run_plan_nginx",
+        },
+      },
+    });
+
+    expect(reduceTuiKeyInput(state, "r", {}).action).toEqual({ type: "rollback.run", runId: "run_plan_nginx" });
+    expect(reduceTuiKeyInput(state, "s", {}).action).toEqual({ type: "rollback.skip", runId: "run_plan_nginx" });
   });
 });

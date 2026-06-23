@@ -21,10 +21,15 @@ export interface TuiThinkingState {
   text: string;
 }
 
+export interface TuiControlState {
+  approvalReasonDraft: string;
+}
+
 export interface TuiState {
   status: TuiStatus;
   input: TuiInputState;
   thinking: TuiThinkingState;
+  controls: TuiControlState;
 }
 
 export type TuiEvent =
@@ -44,6 +49,9 @@ export const createInitialTuiState = (status: TuiStatus): TuiState => ({
   },
   thinking: {
     text: status.thinkingText ?? "",
+  },
+  controls: {
+    approvalReasonDraft: "",
   },
 });
 
