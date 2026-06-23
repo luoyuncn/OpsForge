@@ -14,6 +14,7 @@ Implemented plans:
 
 - Plan 1: `docs/superpowers/plans/2026-06-23-opsforge-plan-1-foundation.md`
 - Plan 2: `docs/superpowers/plans/2026-06-23-opsforge-plan-2-deterministic-pipeline.md`
+- Plan 3: `docs/superpowers/plans/2026-06-23-opsforge-plan-3-audit-persistence.md`
 
 ## Delivered In Plan 1
 
@@ -57,6 +58,21 @@ Implemented plans:
   - `opsforge apply <plan.json>` with `--dry-run`, `--yes`, `--json`, `--risk-max`, and `--allow-shell`.
   - Dry-run path compiles and checks plans without executing host mutation commands.
 
+## Delivered In Plan 3
+
+- `@opsforge/audit`
+  - SQLite-backed `AuditStore` with `plans`, `runs`, `step_runs`, and `audit_events`.
+  - Append-only event persistence plus run list/detail summaries.
+  - stdout/stderr artifact writing under `artifacts/<run_id>/`.
+  - `resolveOpsForgePaths()` expands `~` for configured audit paths.
+  - Uses Node 24 built-in `node:sqlite` instead of `better-sqlite3`; this keeps the SQLite storage semantics from §8.1 while avoiding the native ClangCL toolchain requirement observed on the current Windows development host.
+
+- `@opsforge/cli`
+  - `opsforge apply` records audit history to SQLite by default.
+  - Tests can inject an `AuditStore` to avoid writing to user home.
+  - `opsforge audit ls` lists persisted runs.
+  - `opsforge audit show <run_id>` shows persisted events and step artifact paths.
+
 ## Design Alignment Check
 
 | Spec Area | Status | Evidence | Notes |
@@ -67,18 +83,18 @@ Implemented plans:
 | §4.2 Linux executor | Partial | `packages/executor-linux` | Compile layer exists for apt/dnf/yum and systemd. Real safe file writing needs a later pass. |
 | §4.3 Windows executor | Partial | `packages/executor-windows` | Compile layer exists for winget/choco and services. UAC/admin detection remains open. |
 | §5 Policy and guard | Partial | `packages/policy` | Deterministic classifier/gate/guards exist. More rules and config knobs are needed. |
-| §7.2 CLI mode | Partial | `apps/cli/src/commands/apply.ts` | `doctor` and `apply` exist. `plan/run/verify/rollback/audit/config` remain. |
-| §8 Audit | Partial | `packages/audit` | Event model exists. SQLite and artifacts are not implemented yet. |
+| §7.2 CLI mode | Partial | `apps/cli/src/commands` | `doctor`, `apply`, and `audit ls/show` exist. `plan/run/verify/rollback/config` remain. |
+| §8 Audit | Partial | `packages/audit` | SQLite event store and stdout/stderr artifacts exist. Rich reports, retention/export, rollback audit views, and TUI timeline consumption remain. |
 | §11 Tests | Partial | package tests | Unit tests cover deterministic components and do not mutate the host. |
 
 ## Known Gaps
 
 - LLM planner and Pi runtime are not implemented.
 - TUI primary entry is not implemented; bare `opsforge` still prints a placeholder.
-- Audit persistence is not SQLite yet.
-- Artifacts directory handling is not implemented.
 - Rollback orchestration and CLI `rollback` are not implemented.
-- CLI `plan`, `run`, `verify`, `audit`, and `config` subcommands are not implemented.
+- CLI `plan`, `run`, `verify`, and `config` subcommands are not implemented.
+- Audit retention/export and richer report generation are not implemented.
+- TUI timeline consumption of audit history is not implemented.
 - Provider configuration commands and model capability checks are not implemented.
 - JSON Schema export from DSL is not implemented.
 - Real elevated privilege detection and safe elevation flows are incomplete.
@@ -86,9 +102,4 @@ Implemented plans:
 
 ## Next Plan Recommendation
 
-Plan 3 should focus on either:
-
-1. Audit persistence and CLI audit commands (`better-sqlite3` + artifacts), or
-2. Planner/provider layer for `opsforge plan` with schema-valid mocked provider first.
-
-The safer next slice is audit persistence because it strengthens the execution spine before LLM or TUI work begins.
+Plan 4 should focus on planner/provider scaffolding for `opsforge plan` with a schema-valid mocked provider first, before connecting real LLM providers or the TUI.

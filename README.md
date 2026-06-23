@@ -7,6 +7,7 @@ OpsForge is now being built plan-by-plan on `main`.
 - Design spec: `docs/superpowers/specs/2026-06-23-opsforge-local-ops-agent-design.md`
 - Plan 1 foundation: `docs/superpowers/plans/2026-06-23-opsforge-plan-1-foundation.md`
 - Plan 2 deterministic pipeline: `docs/superpowers/plans/2026-06-23-opsforge-plan-2-deterministic-pipeline.md`
+- Plan 3 audit persistence: `docs/superpowers/plans/2026-06-23-opsforge-plan-3-audit-persistence.md`
 - Current implementation status and design alignment: `docs/implementation-status.md`
 
 Useful commands:
@@ -17,6 +18,8 @@ pnpm test
 pnpm typecheck
 node apps/cli/dist/index.js doctor
 node apps/cli/dist/index.js apply examples/plan-install-nginx.local.json --dry-run
+node apps/cli/dist/index.js audit ls
+node apps/cli/dist/index.js audit show <run_id>
 ```
 
 OpsForge Agent
