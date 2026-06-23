@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { buildAuditCommand } from "./commands/audit";
 import { buildApplyCommand, formatApplyResult, parseRiskMax } from "./commands/apply";
 import { buildDoctorReport, formatDoctorReport } from "./commands/doctor";
 import { systemWhich } from "./which";
@@ -40,6 +41,8 @@ program
     console.log(options.json ? JSON.stringify(result, null, 2) : formatApplyResult(result));
     if (!result.gate.allowed) process.exitCode = 1;
   });
+
+program.addCommand(buildAuditCommand());
 
 if (process.argv.slice(2).length === 0) {
   console.log(
