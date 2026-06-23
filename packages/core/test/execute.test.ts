@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createMemoryAuditRecorder } from "@opsforge/audit";
 import type { Executor, HostFacts } from "@opsforge/executor-base";
 import type { Plan } from "@opsforge/dsl";
-import { executePlan, rollbackPlan } from "../src/index";
+import { executePlan, rollbackPlan, verifyStoredPlan } from "../src/index";
 
 const facts: HostFacts = {
   osFamily: "linux",
@@ -178,5 +178,28 @@ describe("rollbackPlan", () => {
     expect(result.stepResults).toHaveLength(1);
     expect(result.stepResults[0].step).toEqual({ type: "package-remove", name: "nginx" });
     expect(audit.events().map((event) => event.type)).toContain("run.rollback.finished");
+  });
+});
+
+describe("verifyStoredPlan", () => {
+  it("reruns stored verifications and records run.verified for the original run", async () => {
+    const audit = createMemoryAuditRecorder();
+    const result = await verifyStoredPlan({
+      originalRunId: "run_original",
+      plan: basePlan,
+      audit,
+      verifyDeps: { runCommand: async () => ({ stdout: "", stderr: "", exitCode: 0 }) },
+    });
+
+    expect(result.originalRunId).toBe("run_original");
+    expect(result.verificationResults).toHaveLength(1);
+    expect(result.verificationResults[0].ok).toBe(true);
+    expect(audit.events()).toEqual([
+      {
+        type: "run.verified",
+        at: expect.any(String),
+        payload: { runId: "run_original", results: result.verificationResults },
+      },
+    ]);
   });
 });

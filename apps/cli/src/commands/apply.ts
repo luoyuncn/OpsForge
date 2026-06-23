@@ -3,7 +3,7 @@ import { readFile as readFileFromDisk } from "node:fs/promises";
 import { promisify } from "node:util";
 import { createSqliteAuditStore, resolveOpsForgePaths, type AuditStore } from "@opsforge/audit";
 import { loadConfig, type OpsForgeConfig } from "@opsforge/config";
-import { executePlan, rollbackPlan, type ExecutePlanResult } from "@opsforge/core";
+import { executePlan, rollbackPlan, type ExecutePlanResult, type VerifyStoredPlanInput } from "@opsforge/core";
 import { parsePlan, type Plan, type RiskLevel } from "@opsforge/dsl";
 import type { CommandRunner, HostFacts, RawCommandResult } from "@opsforge/executor-base";
 import { createLinuxExecutor } from "@opsforge/executor-linux";
@@ -55,6 +55,17 @@ const defaultRunner: CommandRunner = async (command): Promise<RawCommandResult> 
     return { stdout: err.stdout ?? "", stderr: err.stderr ?? "", exitCode: typeof err.code === "number" ? err.code : 1 };
   }
 };
+
+export const createDefaultVerifyDeps = (): VerifyStoredPlanInput["verifyDeps"] => ({
+  runCommand: async (cmd) =>
+    defaultRunner({
+      shell: detectOs(process.platform) === "windows" ? "powershell" : "bash",
+      argv: cmd,
+      needsElevation: false,
+      describe: `Verify ${cmd}`,
+    }),
+  readFile: (path) => readFileFromDisk(path),
+});
 
 const factsFromHost = (os: DetectedOs, which: WhichRunner): HostFacts => {
   if (os !== "linux" && os !== "windows") {

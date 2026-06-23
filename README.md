@@ -13,6 +13,7 @@ OpsForge is now being built plan-by-plan on `main`.
 - Plan 6 CLI run flow: `docs/superpowers/plans/2026-06-23-opsforge-plan-6-cli-run-flow.md`
 - Plan 7 provider config and OpenAI-compatible adapter: `docs/superpowers/plans/2026-06-23-opsforge-plan-7-provider-config-openai-adapter.md`
 - Plan 8 rollback command: `docs/superpowers/plans/2026-06-23-opsforge-plan-8-rollback-command.md`
+- Plan 9 verify command: `docs/superpowers/plans/2026-06-23-opsforge-plan-9-verify-command.md`
 - Current implementation status and design alignment: `docs/implementation-status.md`
 - Checked-in Plan schema artifact: `schemas/plan.schema.json`
 
@@ -33,6 +34,8 @@ node apps/cli/dist/index.js config show
 node apps/cli/dist/index.js plan "install nginx" --provider configured --json
 node apps/cli/dist/index.js apply .opsforge-tmp/plan-nginx.json --dry-run
 node apps/cli/dist/index.js apply examples/plan-install-nginx.local.json --dry-run
+node apps/cli/dist/index.js verify <run_id>
+node apps/cli/dist/index.js verify <run_id> --json
 node apps/cli/dist/index.js rollback <run_id> --dry-run
 node apps/cli/dist/index.js rollback <run_id> --dry-run --json
 node apps/cli/dist/index.js audit ls

@@ -22,12 +22,25 @@ export interface RollbackPlanInput extends ExecutePlanInput {
   originalRunId: string;
 }
 
+export interface VerifyStoredPlanInput {
+  originalRunId: string;
+  plan: Plan;
+  audit: AuditRecorder;
+  verifyDeps: VerifyDeps;
+}
+
 export interface ExecutePlanResult {
   runId: string;
   risk: RiskLevel;
   gate: GateDecision;
   commands: CompiledCommand[];
   stepResults: StepResult[];
+  verificationResults: VerificationResult[];
+  auditEvents: ReturnType<AuditRecorder["events"]>;
+}
+
+export interface VerifyStoredPlanResult {
+  originalRunId: string;
   verificationResults: VerificationResult[];
   auditEvents: ReturnType<AuditRecorder["events"]>;
 }
@@ -240,5 +253,20 @@ export const rollbackPlan = async (input: RollbackPlanInput): Promise<ExecutePla
     stepResults,
     verificationResults: [],
     auditEvents: rollbackInput.audit.events(),
+  };
+};
+
+export const verifyStoredPlan = async (input: VerifyStoredPlanInput): Promise<VerifyStoredPlanResult> => {
+  const verificationResults = await verifyPlan(input.plan.verifications, input.verifyDeps);
+  input.audit.record({
+    type: "run.verified",
+    at: now(),
+    payload: { runId: input.originalRunId, results: verificationResults },
+  });
+
+  return {
+    originalRunId: input.originalRunId,
+    verificationResults,
+    auditEvents: input.audit.events(),
   };
 };

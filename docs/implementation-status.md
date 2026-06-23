@@ -20,6 +20,7 @@ Implemented plans:
 - Plan 6: `docs/superpowers/plans/2026-06-23-opsforge-plan-6-cli-run-flow.md`
 - Plan 7: `docs/superpowers/plans/2026-06-23-opsforge-plan-7-provider-config-openai-adapter.md`
 - Plan 8: `docs/superpowers/plans/2026-06-23-opsforge-plan-8-rollback-command.md`
+- Plan 9: `docs/superpowers/plans/2026-06-23-opsforge-plan-9-verify-command.md`
 
 ## Delivered In Plan 1
 
@@ -146,18 +147,29 @@ Implemented plans:
   - `opsforge rollback <run_id>` executes stored rollback steps for the original run's Plan.
   - `opsforge rollback <run_id> --json` returns the original run ID and rollback result payload.
 
+## Delivered In Plan 9
+
+- `@opsforge/core`
+  - `verifyStoredPlan()` reruns stored Plan verifications and records a fresh `run.verified` event against the original run ID.
+  - Verification replay does not recompile or execute mutation steps.
+
+- `@opsforge/cli`
+  - `opsforge verify <run_id>` loads the Plan stored in audit history and replays `plan.verifications`.
+  - `opsforge verify <run_id> --json` emits the verification replay payload for scripts.
+  - The command exits non-zero when the stored Plan is missing or any verification fails.
+
 ## Design Alignment Check
 
 | Spec Area | Status | Evidence | Notes |
 |---|---:|---|---|
 | §3 DSL | Partial | `packages/dsl`, `schemas/plan.schema.json` | Core schema and Plan JSON Schema export exist. Job/approval/inventory/audit schema artifacts remain. |
-| §4 Core pipeline | Partial | `packages/core/src/execute.ts`, `apps/cli/src/commands/run.ts`, `apps/cli/src/commands/rollback.ts` | Deterministic spine exists, is reachable from NL via `run`, and has a manual rollback branch. Automatic rollback on failed verification is not implemented yet. |
+| §4 Core pipeline | Partial | `packages/core/src/execute.ts`, `apps/cli/src/commands/run.ts`, `apps/cli/src/commands/rollback.ts`, `apps/cli/src/commands/verify.ts` | Deterministic spine exists, is reachable from NL via `run`, has manual rollback, and can manually replay stored verifications. Automatic rollback on failed verification is not implemented yet. |
 | §4.1 Executor abstraction | Partial | `packages/executor-base` | Interfaces and injectable runner exist. Real host detection is still shallow. |
 | §4.2 Linux executor | Partial | `packages/executor-linux` | Compile layer exists for apt/dnf/yum and systemd. Real safe file writing needs a later pass. |
 | §4.3 Windows executor | Partial | `packages/executor-windows` | Compile layer exists for winget/choco and services. UAC/admin detection remains open. |
 | §5 Policy and guard | Partial | `packages/policy` | Deterministic classifier/gate/guards exist. More rules and config knobs are needed. |
 | §6 Planner/provider layer | Partial | `packages/planner`, `packages/config`, `apps/cli/src/provider.ts` | Provider boundary, DSL validation, mock provider, persistent provider config, and OpenAI-compatible adapter exist. Anthropic/Google/Pi adapters, JSON retry/tool-call retry loops, model capability checks, and Pi sessions remain. |
-| §7.2 CLI mode | Partial | `apps/cli/src/commands` | `doctor`, `plan`, `plan --out`, `run`, `apply`, `rollback`, `config provider/show`, and `audit ls/show` exist. `verify` remains. |
+| §7.2 CLI mode | Partial | `apps/cli/src/commands` | `doctor`, `plan`, `plan --out`, `run`, `apply`, `verify`, `rollback`, `config provider/show`, and `audit ls/show` exist. |
 | §8 Audit | Partial | `packages/audit` | SQLite event store, stored Plan JSON, and stdout/stderr artifacts exist. Rich reports, retention/export, rollback audit views, and TUI timeline consumption remain. |
 | §11 Tests | Partial | package tests | Unit tests cover deterministic components and do not mutate the host. |
 
@@ -167,8 +179,8 @@ Implemented plans:
 - Planner JSON-mode retry/tool-call retry loops are not implemented.
 - TUI primary entry is not implemented; bare `opsforge` still prints a placeholder.
 - Rollback is manual only; automatic rollback after failed verification is not implemented.
+- Verification replay is manual only; no scheduled or automatic verification loop exists yet.
 - Rollback reporting is basic and does not yet provide rich rollback views in audit output.
-- CLI `verify` is not implemented.
 - Audit retention/export and richer report generation are not implemented.
 - TUI timeline consumption of audit history is not implemented.
 - Model capability checks are not implemented.
@@ -179,9 +191,9 @@ Implemented plans:
 
 ## Next Plan Recommendation
 
-Plan 9 should focus on either:
+Plan 10 should focus on either:
 
-1. `opsforge verify <run_id>` to replay stored verification specs against persisted run records, or
-2. automatic rollback prompt/trigger after failed execution or failed verification.
+1. automatic rollback prompt/trigger after failed execution or failed verification, or
+2. expanding verifier coverage for service/package/port checks with real host dependencies.
 
-The safer next slice is `opsforge verify <run_id>` because full Plan JSON is now stored in audit history and can supply the original verification specs.
+The safer next slice is automatic rollback orchestration because manual `verify` and manual `rollback` now both exist and share stored Plan JSON from audit history.

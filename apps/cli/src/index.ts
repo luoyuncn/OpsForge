@@ -8,6 +8,7 @@ import { buildDoctorReport, formatDoctorReport } from "./commands/doctor";
 import { buildPlanCommand } from "./commands/plan";
 import { buildRollbackCommand } from "./commands/rollback";
 import { buildRunCommand } from "./commands/run";
+import { buildVerifyCommand } from "./commands/verify";
 import { systemWhich } from "./which";
 
 const readOptionalConfigFile = (): string | null => {
@@ -63,6 +64,7 @@ program.addCommand(buildConfigCommand());
 program.addCommand(buildPlanCommand());
 program.addCommand(buildRollbackCommand());
 program.addCommand(buildRunCommand());
+program.addCommand(buildVerifyCommand());
 
 if (process.argv.slice(2).length === 0) {
   console.log(
