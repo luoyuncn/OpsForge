@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { readFile as readFileFromDisk } from "node:fs/promises";
+import { createConnection } from "node:net";
 import { promisify } from "node:util";
 import { createSqliteAuditStore, resolveOpsForgePaths, type AuditStore } from "@opsforge/audit";
 import { loadConfig, type OpsForgeConfig } from "@opsforge/config";
@@ -42,6 +43,12 @@ export type ApplyResult = ExecutePlanResult & {
 
 const commandToText = (argv: string[] | string): string => (Array.isArray(argv) ? argv.join(" ") : argv);
 
+export interface DefaultVerifyDepsOptions {
+  platform?: NodeJS.Platform;
+  packageManagers?: string[];
+  runner?: CommandRunner;
+}
+
 const defaultRunner: CommandRunner = async (command): Promise<RawCommandResult> => {
   const commandText = commandToText(command.argv);
   const shellArgs = command.shell === "powershell"
@@ -58,16 +65,105 @@ const defaultRunner: CommandRunner = async (command): Promise<RawCommandResult> 
   }
 };
 
-export const createDefaultVerifyDeps = (): VerifyStoredPlanInput["verifyDeps"] => ({
-  runCommand: async (cmd) =>
-    defaultRunner({
-      shell: detectOs(process.platform) === "windows" ? "powershell" : "bash",
+const safeBashArg = (value: string): string =>
+  /^[A-Za-z0-9_.@/+:-]+$/.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`;
+
+const safePowerShellString = (value: string): string => `'${value.replaceAll("'", "''")}'`;
+
+const firstOutputLine = (stdout: string): string | undefined => {
+  const line = stdout.split(/\r?\n/).map((part) => part.trim()).find(Boolean);
+  return line;
+};
+
+const normalizeServiceStatus = (status: string | undefined): string | undefined => {
+  const normalized = status?.trim().toLowerCase();
+  if (!normalized) return undefined;
+  if (normalized === "inactive") return "stopped";
+  return normalized;
+};
+
+const isLocalPortOpen = (port: number, timeoutMs = 500): Promise<boolean> =>
+  new Promise((resolve) => {
+    const socket = createConnection({ host: "127.0.0.1", port });
+    const finish = (open: boolean) => {
+      socket.removeAllListeners();
+      socket.destroy();
+      resolve(open);
+    };
+
+    socket.setTimeout(timeoutMs);
+    socket.once("connect", () => finish(true));
+    socket.once("timeout", () => finish(false));
+    socket.once("error", () => finish(false));
+  });
+
+export const createDefaultVerifyDeps = (
+  options: DefaultVerifyDepsOptions = {},
+): VerifyStoredPlanInput["verifyDeps"] => {
+  const platform = options.platform ?? process.platform;
+  const os = detectOs(platform);
+  const runner = options.runner ?? defaultRunner;
+  const packageManagers = options.packageManagers ?? (os === "linux" || os === "windows"
+    ? detectPackageManagers(os, systemWhich)
+    : []);
+  const runProbe = async (cmd: string) =>
+    runner({
+      shell: os === "windows" ? "powershell" : "bash",
       argv: cmd,
       needsElevation: false,
       describe: `Verify ${cmd}`,
-    }),
-  readFile: (path) => readFileFromDisk(path),
-});
+    });
+
+  return {
+    runCommand: (cmd) => runProbe(cmd),
+    readFile: (path) => readFileFromDisk(path),
+    getPackageVersion: async (name) => {
+      if (os === "windows") {
+        const result = await runProbe(
+          `Get-Package -Name ${safePowerShellString(name)} -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Version`,
+        );
+        return result.exitCode === 0 ? firstOutputLine(result.stdout) : undefined;
+      }
+
+      if (os !== "linux") return undefined;
+      const packageName = safeBashArg(name);
+      const command = packageManagers.includes("apt")
+        ? `dpkg-query -W -f=\${Version} ${packageName}`
+        : packageManagers.some((manager) => manager === "dnf" || manager === "yum")
+          ? `rpm -q --qf %{VERSION} ${packageName}`
+          : undefined;
+      if (!command) return undefined;
+
+      const result = await runProbe(command);
+      return result.exitCode === 0 ? firstOutputLine(result.stdout) : undefined;
+    },
+    getServiceStatus: async (name) => {
+      if (os === "windows") {
+        const result = await runProbe(
+          `Get-Service -Name ${safePowerShellString(name)} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Status`,
+        );
+        return normalizeServiceStatus(firstOutputLine(result.stdout));
+      }
+
+      if (os !== "linux") return undefined;
+      const result = await runProbe(`systemctl is-active ${safeBashArg(name)}`);
+      return normalizeServiceStatus(firstOutputLine(result.stdout));
+    },
+    isPortOpen: (port) => isLocalPortOpen(port),
+    isProcessAlive: async (name) => {
+      if (os === "windows") {
+        const result = await runProbe(
+          `Get-Process -Name ${safePowerShellString(name)} -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty ProcessName`,
+        );
+        return result.exitCode === 0 && Boolean(firstOutputLine(result.stdout));
+      }
+
+      if (os !== "linux") return false;
+      const result = await runProbe(`pgrep -x ${safeBashArg(name)}`);
+      return result.exitCode === 0;
+    },
+  };
+};
 
 const factsFromHost = (os: DetectedOs, which: WhichRunner): HostFacts => {
   if (os !== "linux" && os !== "windows") {

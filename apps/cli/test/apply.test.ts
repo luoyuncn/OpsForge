@@ -1,5 +1,6 @@
+import { createServer } from "node:net";
 import { describe, expect, it } from "vitest";
-import { buildApplyCommand, formatApplyResult } from "../src/commands/apply";
+import { buildApplyCommand, createDefaultVerifyDeps, formatApplyResult } from "../src/commands/apply";
 import { createMemoryAuditRecorder, type AuditStore } from "@opsforge/audit";
 import type { HostFacts } from "@opsforge/executor-base";
 
@@ -107,6 +108,71 @@ describe("buildApplyCommand", () => {
     expect(auditStore.artifactWrites).toEqual([
       { runId: result.runId, stepIndex: 0, stdout: "installed", stderr: "note" },
     ]);
+  });
+});
+
+describe("createDefaultVerifyDeps", () => {
+  it("creates linux default verifier probes for package, service, and process checks", async () => {
+    const calls: string[] = [];
+    const deps = createDefaultVerifyDeps({
+      platform: "linux",
+      packageManagers: ["apt"],
+      runner: async (command) => {
+        const commandText = Array.isArray(command.argv) ? command.argv.join(" ") : command.argv;
+        calls.push(commandText);
+        if (commandText.startsWith("dpkg-query")) return { stdout: "1.24.0\n", stderr: "", exitCode: 0 };
+        if (commandText.startsWith("systemctl")) return { stdout: "active\n", stderr: "", exitCode: 0 };
+        if (commandText.startsWith("pgrep")) return { stdout: "123\n", stderr: "", exitCode: 0 };
+        return { stdout: "", stderr: "", exitCode: 1 };
+      },
+    });
+
+    await expect(deps.getPackageVersion?.("nginx")).resolves.toBe("1.24.0");
+    await expect(deps.getServiceStatus?.("nginx")).resolves.toBe("active");
+    await expect(deps.isProcessAlive?.("nginx")).resolves.toBe(true);
+    expect(calls).toEqual([
+      "dpkg-query -W -f=${Version} nginx",
+      "systemctl is-active nginx",
+      "pgrep -x nginx",
+    ]);
+  });
+
+  it("creates windows default verifier probes for package, service, and process checks", async () => {
+    const calls: string[] = [];
+    const deps = createDefaultVerifyDeps({
+      platform: "win32",
+      runner: async (command) => {
+        const commandText = Array.isArray(command.argv) ? command.argv.join(" ") : command.argv;
+        calls.push(commandText);
+        if (commandText.startsWith("Get-Package")) return { stdout: "2.0.0\n", stderr: "", exitCode: 0 };
+        if (commandText.startsWith("Get-Service")) return { stdout: "Running\n", stderr: "", exitCode: 0 };
+        if (commandText.startsWith("Get-Process")) return { stdout: "nginx\n", stderr: "", exitCode: 0 };
+        return { stdout: "", stderr: "", exitCode: 1 };
+      },
+    });
+
+    await expect(deps.getPackageVersion?.("nginx")).resolves.toBe("2.0.0");
+    await expect(deps.getServiceStatus?.("nginx")).resolves.toBe("running");
+    await expect(deps.isProcessAlive?.("nginx")).resolves.toBe(true);
+    expect(calls).toEqual([
+      "Get-Package -Name 'nginx' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Version",
+      "Get-Service -Name 'nginx' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Status",
+      "Get-Process -Name 'nginx' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty ProcessName",
+    ]);
+  });
+
+  it("checks local TCP ports through the default verifier probes", async () => {
+    const server = createServer();
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Expected TCP server address");
+
+    const deps = createDefaultVerifyDeps({ platform: "linux", packageManagers: [] });
+
+    await expect(deps.isPortOpen?.(address.port)).resolves.toBe(true);
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+    await expect(deps.isPortOpen?.(address.port)).resolves.toBe(false);
   });
 });
 
