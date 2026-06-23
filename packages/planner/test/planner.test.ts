@@ -6,15 +6,66 @@ import {
   createGooglePlanProvider,
   createMockPlanProvider,
   createOpenAICompatiblePlanProvider,
+  findSkillTemplateForPrompt,
   GoogleProviderError,
   OpenAICompatibleProviderError,
   PlannerValidationError,
 } from "../src/index";
 
-describe("buildPlanFromPrompt", () => {
-  it("returns a schema-valid install plan from the mock provider", async () => {
+describe("skill templates", () => {
+  it("matches deterministic install templates from prompts", () => {
+    expect(findSkillTemplateForPrompt("install docker")).toMatchObject({ id: "install-docker" });
+    expect(findSkillTemplateForPrompt("please install nodejs locally")).toMatchObject({ id: "install-nodejs" });
+    expect(findSkillTemplateForPrompt("install nginx")).toMatchObject({ id: "install-nginx" });
+    expect(findSkillTemplateForPrompt("install htop")).toBeUndefined();
+  });
+
+  it("uses a matching deterministic template in the mock provider", async () => {
     const plan = await buildPlanFromPrompt({
-      prompt: "install nginx",
+      prompt: "install docker",
+      provider: createMockPlanProvider(),
+      now: () => "2026-06-23T00:00:00Z",
+      planId: () => "plan_skill_1",
+    });
+
+    expect(plan.title).toBe("Install Docker");
+    expect(plan.packageSpec).toEqual({ name: "docker" });
+    expect(plan.steps).toEqual([
+      { type: "package-update-cache" },
+      { type: "package-install", name: "docker" },
+      { type: "service-enable", name: "docker" },
+      { type: "service-start", name: "docker" },
+    ]);
+    expect(plan.verifications).toEqual([
+      { type: "package-version", name: "docker" },
+      { type: "service-status", name: "docker", expect: "active" },
+      { type: "process-alive", name: "docker" },
+    ]);
+    expect(plan.rollback).toEqual([
+      { type: "service-stop", name: "docker" },
+      { type: "package-remove", name: "docker" },
+    ]);
+    expect(plan.explanation.join("\n")).toContain("install-docker");
+  });
+
+  it("falls back to a generic package install when no skill template matches", async () => {
+    const plan = await buildPlanFromPrompt({
+      prompt: "install htop",
+      provider: createMockPlanProvider(),
+      now: () => "2026-06-23T00:00:00Z",
+      planId: () => "plan_generic_1",
+    });
+
+    expect(plan.title).toBe("Install htop");
+    expect(plan.steps).toEqual([{ type: "package-install", name: "htop" }]);
+    expect(plan.rollback).toEqual([{ type: "package-remove", name: "htop" }]);
+  });
+});
+
+describe("buildPlanFromPrompt", () => {
+  it("returns a schema-valid generic install plan from the mock provider", async () => {
+    const plan = await buildPlanFromPrompt({
+      prompt: "install redis",
       provider: createMockPlanProvider(),
       now: () => "2026-06-23T00:00:00Z",
       planId: () => "plan_mock_1",
@@ -22,14 +73,14 @@ describe("buildPlanFromPrompt", () => {
 
     expect(plan).toMatchObject({
       id: "plan_mock_1",
-      title: "Install nginx",
+      title: "Install redis",
       intent: "install",
       risk: "L1",
       createdAt: "2026-06-23T00:00:00Z",
     });
     expect(plan.steps.map((step) => step.type)).toEqual(["package-install"]);
-    expect(plan.verifications[0]).toEqual({ type: "smoke-test", cmd: "nginx --version", expectExit: 0 });
-    expect(plan.rollback[0]).toEqual({ type: "package-remove", name: "nginx" });
+    expect(plan.verifications[0]).toEqual({ type: "smoke-test", cmd: "redis --version", expectExit: 0 });
+    expect(plan.rollback[0]).toEqual({ type: "package-remove", name: "redis" });
   });
 
   it("rejects provider output that does not match the DSL schema", async () => {
@@ -93,6 +144,9 @@ describe("createOpenAICompatiblePlanProvider", () => {
     expect(body.temperature).toBe(0);
     expect(body.response_format).toEqual({ type: "json_object" });
     expect(body.messages.at(-1).content).toContain("install nginx");
+    expect(body.messages.at(-1).content).toContain("install-nginx");
+    expect(body.messages.at(-1).content).toContain("install-docker");
+    expect(body.messages.at(-1).content).toContain("install-nodejs");
   });
 
   it("throws a typed error for non-2xx responses", async () => {
@@ -131,7 +185,12 @@ describe("createAnthropicPlanProvider", () => {
     expect(plan.id).toBe("plan_anthropic_1");
     expect(requests[0].url).toBe("https://api.anthropic.com/v1/messages");
     expect(requests[0].init.headers["x-api-key"]).toBe("test-key");
-    expect(JSON.parse(String(requests[0].init.body)).model).toBe("claude-3-5-sonnet-latest");
+    const body = JSON.parse(String(requests[0].init.body));
+    expect(body.model).toBe("claude-3-5-sonnet-latest");
+    expect(body.messages[0].content).toContain("install nginx");
+    expect(body.messages[0].content).toContain("install-nginx");
+    expect(body.messages[0].content).toContain("install-docker");
+    expect(body.messages[0].content).toContain("install-nodejs");
   });
 
   it("throws a typed error for Anthropic failures", async () => {
@@ -168,7 +227,11 @@ describe("createGooglePlanProvider", () => {
 
     expect(plan.id).toBe("plan_google_1");
     expect(requests[0].url).toBe("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=test-key");
-    expect(JSON.parse(String(requests[0].init.body)).contents[0].parts[0].text).toContain("install nginx");
+    const body = JSON.parse(String(requests[0].init.body));
+    expect(body.contents[0].parts[0].text).toContain("install nginx");
+    expect(body.contents[0].parts[0].text).toContain("install-nginx");
+    expect(body.contents[0].parts[0].text).toContain("install-docker");
+    expect(body.contents[0].parts[0].text).toContain("install-nodejs");
   });
 
   it("throws a typed error for Google failures", async () => {

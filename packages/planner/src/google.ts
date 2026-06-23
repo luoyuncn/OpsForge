@@ -1,5 +1,6 @@
 import { OpsForgeError } from "@opsforge/shared";
 import type { PlanProvider } from "./providers";
+import { buildPlannerPrompt } from "./skill-templates";
 
 export class GoogleProviderError extends OpsForgeError {
   constructor(message: string) {
@@ -65,7 +66,7 @@ export const createGooglePlanProvider = (options: GoogleProviderOptions): PlanPr
             contents: [
               {
                 role: "user",
-                parts: [{ text: prompt }],
+                parts: [{ text: buildPlannerPrompt(prompt) }],
               },
             ],
           }),

@@ -1,5 +1,6 @@
 import { OpsForgeError } from "@opsforge/shared";
 import type { PlanProvider } from "./providers";
+import { buildPlannerPrompt } from "./skill-templates";
 
 export class AnthropicProviderError extends OpsForgeError {
   constructor(message: string) {
@@ -58,7 +59,7 @@ export const createAnthropicPlanProvider = (options: AnthropicProviderOptions): 
             messages: [
               {
                 role: "user",
-                content: prompt,
+                content: buildPlannerPrompt(prompt),
               },
             ],
           }),

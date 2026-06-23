@@ -1,5 +1,6 @@
 import { OpsForgeError } from "@opsforge/shared";
 import type { PlanProvider } from "./providers";
+import { buildPlannerPrompt } from "./skill-templates";
 
 export class OpenAICompatibleProviderError extends OpsForgeError {
   constructor(message: string) {
@@ -62,7 +63,7 @@ export const createOpenAICompatiblePlanProvider = (options: OpenAICompatibleProv
               },
               {
                 role: "user",
-                content: prompt,
+                content: buildPlannerPrompt(prompt),
               },
             ],
           }),

@@ -5,3 +5,4 @@ export * from "./openai-compatible";
 export * from "./anthropic";
 export * from "./google";
 export * from "./capabilities";
+export * from "./skill-templates";

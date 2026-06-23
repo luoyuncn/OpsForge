@@ -36,6 +36,7 @@ Implemented plans:
 - Plan 22: `docs/superpowers/plans/2026-06-23-opsforge-plan-22-provider-depth-capabilities.md`
 - Plan 23: `docs/superpowers/plans/2026-06-23-opsforge-plan-23-tui-runtime-wiring.md`
 - Plan 24: `docs/superpowers/plans/2026-06-23-opsforge-plan-24-safe-file-write-template.md`
+- Plan 25: `docs/superpowers/plans/2026-06-23-opsforge-plan-25-skill-templates.md`
 
 ## Delivered In Plan 1
 
@@ -330,6 +331,17 @@ Implemented plans:
   - The default local command runner now writes `CompiledCommand.stdin` into child process stdin.
   - Apply tests cover stdin-backed file-write execution with an injected runner and no real host mutation.
 
+## Delivered In Plan 25
+
+- `@opsforge/planner`
+  - Added deterministic skill templates for `install-nginx`, `install-docker`, and `install-nodejs`.
+  - Mock planning now uses matching skill templates before falling back to generic package installation.
+  - OpenAI-compatible, Anthropic, and Google planning prompts now include compact skill template context so real provider planning sees the same DSL skeleton guidance used by the TUI runtime path.
+
+- `skills/`
+  - Added checked-in human-readable skill template docs for nginx, Docker, and Node.js.
+  - Templates remain DSL skeletons only; execution still flows through policy, guard, executor, verifier, rollback, and audit.
+
 ## Design Alignment Check
 
 | Spec Area | Status | Evidence | Notes |
@@ -340,8 +352,8 @@ Implemented plans:
 | §4.2 Linux executor | Partial | `packages/executor-linux` | Compile layer exists for apt/dnf/yum, systemd, and stdin-backed file write/template operations. Atomic backups and richer file permissions remain open. |
 | §4.3 Windows executor | Partial | `packages/executor-windows`, `apps/cli/src/host-facts.ts` | Compile layer exists for winget/choco, services, and stdin-backed file write/template operations. Doctor can detect admin status with `net session`; safe UAC elevation flow remains open. |
 | §5 Policy and guard | Partial | `packages/policy` | Deterministic classifier/gate/guards exist. More rules and config knobs are needed. |
-| §6 Planner/provider layer | Partial | `packages/planner`, `packages/config`, `packages/pi-runtime`, `apps/cli/src/provider.ts`, `apps/cli/src/commands/doctor.ts` | Provider boundary, DSL validation, mock provider, persistent provider config, OpenAI-compatible adapter, Anthropic adapter, Google adapter, provider capability reporting, typed Pi runtime event bridge, and runtime action controller exist. Real Pi SDK sessions, JSON retry/tool-call retry loops, and model discovery remain. |
-| §7.1 TUI mode | Partial | `packages/tui`, `packages/tui/src/plan-card.ts`, `packages/tui/src/timeline.ts`, `packages/tui/src/prompts.ts`, `packages/tui/src/state.ts`, `packages/tui/src/runtime-adapter.ts`, `packages/tui/src/controls.ts`, `packages/pi-runtime/src/actions.ts`, `apps/cli/src/index.ts`, `apps/cli/src/tui-runtime.ts` | `@opsforge/tui` exists, `opsforge` no-arg enters the TUI path in TTY, a deterministic Plan card can render risk/prechecks/steps/compiled command previews/verifications/rollback preview/explanation, a deterministic execution timeline can render step output/exit codes/verification results/rollback recommendations, inline approval/rollback prompt states can render, a pure event/input reducer can drive those views, runtime events can be adapted into TUI events, keyboard input can emit typed prompt/approval/rollback actions, async TUI action handlers can feed returned events back into state, and the no-arg CLI entry now wires prompt submission to provider planning plus guarded core execution. Real Pi SDK streaming and TUI audit-history rollback lookup remain. |
+| §6 Planner/provider layer | Partial | `packages/planner`, `packages/config`, `packages/pi-runtime`, `apps/cli/src/provider.ts`, `apps/cli/src/commands/doctor.ts`, `skills/` | Provider boundary, DSL validation, mock provider, deterministic skill templates, persistent provider config, OpenAI-compatible adapter, Anthropic adapter, Google adapter, provider capability reporting, typed Pi runtime event bridge, and runtime action controller exist. Real Pi SDK sessions, JSON retry/tool-call retry loops, and model discovery remain. |
+| §7.1 TUI mode | Partial | `packages/tui`, `packages/tui/src/plan-card.ts`, `packages/tui/src/timeline.ts`, `packages/tui/src/prompts.ts`, `packages/tui/src/state.ts`, `packages/tui/src/runtime-adapter.ts`, `packages/tui/src/controls.ts`, `packages/pi-runtime/src/actions.ts`, `apps/cli/src/index.ts`, `apps/cli/src/tui-runtime.ts`, `packages/planner/src/skill-templates.ts` | `@opsforge/tui` exists, `opsforge` no-arg enters the TUI path in TTY, a deterministic Plan card can render risk/prechecks/steps/compiled command previews/verifications/rollback preview/explanation, a deterministic execution timeline can render step output/exit codes/verification results/rollback recommendations, inline approval/rollback prompt states can render, a pure event/input reducer can drive those views, runtime events can be adapted into TUI events, keyboard input can emit typed prompt/approval/rollback actions, async TUI action handlers can feed returned events back into state, the no-arg CLI entry now wires prompt submission to provider planning plus guarded core execution, and planner skill templates are available through that same prompt path. Real Pi SDK streaming and TUI audit-history rollback lookup remain. |
 | §7.2 CLI mode | Partial | `apps/cli/src/commands` | `doctor`, `plan`, `plan --out`, `run`, `apply`, `verify`, `rollback`, `config provider/show`, and `audit ls/show` exist. `doctor` now reports richer HostFacts and readiness warnings; `apply` and `run` support `--auto-rollback`; default verification includes read-only host probes. |
 | §8 Audit | Partial | `packages/audit` | SQLite event store, stored Plan JSON, and stdout/stderr artifacts exist. Rich reports, retention/export, rollback audit views, and TUI timeline consumption remain. |
 | §11 Tests | Partial | package tests | Unit tests cover deterministic components, all current verifier variants, default verifier probe command generation, local TCP port checks, HostFacts detection, doctor warnings, TUI snapshot rendering, and no-arg TUI entry decisions without mutating the host. |
@@ -361,11 +373,12 @@ The implementation priority is now locked back to the design document's product 
 - Plan 22: Add Anthropic/Google provider depth and expose provider capability reporting in doctor.
 - Plan 23: Wire the no-argument TUI entry to runtime action handling, provider planning, and guarded core execution.
 - Plan 24: Add stdin-backed safe file-write and file-template execution semantics.
-- After Plan 24: continue with skill templates, safe elevation flows, and richer audit/reporting.
+- Plan 25: Add deterministic skill templates for common local operations and feed them into the planner/TUI path.
+- After Plan 25: continue with TUI rollback-from-audit wiring, safe elevation flows, and richer audit/export reporting.
 
 ## Remaining Implementation Estimate
 
-To finish the full Phase 1 MVP described in the design document, the project likely needs roughly 2 more plan-sized slices after Plan 24. The immediate remaining tracks are skill templates, safe elevation flows, and richer audit/export/reporting.
+To finish the full Phase 1 MVP described in the design document, the project likely needs roughly 3 more plan-sized slices after Plan 25. The immediate remaining tracks are TUI rollback-from-audit wiring, safe elevation flows, and richer audit/export/reporting.
 
 ## Known Gaps
 
@@ -385,8 +398,8 @@ To finish the full Phase 1 MVP described in the design document, the project lik
 - Only the Plan JSON Schema artifact is exported; job, approval, inventory, and audit schema artifacts remain.
 - Generated plans are persisted as files, not yet in a first-class plan registry.
 - Safe elevation flows are incomplete; current work detects elevated state but does not request or broker elevation.
-- Skill templates such as install-nginx/install-docker/install-nodejs are not implemented.
+- Skill templates for install-nginx/install-docker/install-nodejs exist; more templates and real Pi skill ingestion remain open.
 
 ## Next Plan Recommendation
 
-Plan 25 should focus on first-class skill templates for common local operations such as install-nginx/install-docker/install-nodejs, keeping them as deterministic DSL examples that the planner/TUI can surface.
+Plan 26 should focus on wiring TUI rollback actions to stored audit rollback execution so failed TUI runs can continue to rollback without leaving the primary interface.

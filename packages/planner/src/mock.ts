@@ -1,4 +1,5 @@
 import type { PlanProvider } from "./providers";
+import { buildPlanFromSkillTemplate, findSkillTemplateForPrompt } from "./skill-templates";
 
 const packageNameFromPrompt = (prompt: string): string => {
   const normalized = prompt.toLowerCase();
@@ -11,6 +12,9 @@ const titleForPackage = (name: string): string => `Install ${name}`;
 export const createMockPlanProvider = (): PlanProvider => ({
   name: "mock",
   buildPlan: async ({ prompt }) => {
+    const template = findSkillTemplateForPrompt(prompt);
+    if (template) return buildPlanFromSkillTemplate(template);
+
     const name = packageNameFromPrompt(prompt);
     return {
       title: titleForPackage(name),
