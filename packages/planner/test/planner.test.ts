@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  AnthropicProviderError,
   buildPlanFromPrompt,
+  createAnthropicPlanProvider,
+  createGooglePlanProvider,
   createMockPlanProvider,
   createOpenAICompatiblePlanProvider,
+  GoogleProviderError,
   OpenAICompatibleProviderError,
   PlannerValidationError,
 } from "../src/index";
@@ -100,5 +104,80 @@ describe("createOpenAICompatiblePlanProvider", () => {
     });
 
     await expect(provider.buildPlan({ prompt: "install nginx" })).rejects.toBeInstanceOf(OpenAICompatibleProviderError);
+  });
+});
+
+describe("createAnthropicPlanProvider", () => {
+  it("requests a JSON plan from Anthropic messages", async () => {
+    const requests: Array<{ url: string; init: RequestInit & { headers: Record<string, string> } }> = [];
+    const provider = createAnthropicPlanProvider({
+      apiKey: "test-key",
+      model: "claude-3-5-sonnet-latest",
+      fetch: async (url, init) => {
+        requests.push({ url: String(url), init: init as RequestInit & { headers: Record<string, string> } });
+        return new Response(JSON.stringify({
+          content: [{ type: "text", text: JSON.stringify({ title: "Install nginx", intent: "install", steps: [{ type: "package-install", name: "nginx" }], risk: "L1" }) }],
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      },
+    });
+
+    const plan = await buildPlanFromPrompt({
+      prompt: "install nginx",
+      provider,
+      planId: () => "plan_anthropic_1",
+      now: () => "2026-06-23T00:00:00Z",
+    });
+
+    expect(plan.id).toBe("plan_anthropic_1");
+    expect(requests[0].url).toBe("https://api.anthropic.com/v1/messages");
+    expect(requests[0].init.headers["x-api-key"]).toBe("test-key");
+    expect(JSON.parse(String(requests[0].init.body)).model).toBe("claude-3-5-sonnet-latest");
+  });
+
+  it("throws a typed error for Anthropic failures", async () => {
+    const provider = createAnthropicPlanProvider({
+      apiKey: "test-key",
+      model: "claude-3-5-sonnet-latest",
+      fetch: async () => new Response("bad", { status: 500 }),
+    });
+
+    await expect(provider.buildPlan({ prompt: "install nginx" })).rejects.toBeInstanceOf(AnthropicProviderError);
+  });
+});
+
+describe("createGooglePlanProvider", () => {
+  it("requests a JSON plan from Google generateContent", async () => {
+    const requests: Array<{ url: string; init: RequestInit }> = [];
+    const provider = createGooglePlanProvider({
+      apiKey: "test-key",
+      model: "gemini-1.5-flash",
+      fetch: async (url, init) => {
+        requests.push({ url: String(url), init: init as RequestInit });
+        return new Response(JSON.stringify({
+          candidates: [{ content: { parts: [{ text: JSON.stringify({ title: "Install nginx", intent: "install", steps: [{ type: "package-install", name: "nginx" }], risk: "L1" }) }] } }],
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      },
+    });
+
+    const plan = await buildPlanFromPrompt({
+      prompt: "install nginx",
+      provider,
+      planId: () => "plan_google_1",
+      now: () => "2026-06-23T00:00:00Z",
+    });
+
+    expect(plan.id).toBe("plan_google_1");
+    expect(requests[0].url).toBe("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=test-key");
+    expect(JSON.parse(String(requests[0].init.body)).contents[0].parts[0].text).toContain("install nginx");
+  });
+
+  it("throws a typed error for Google failures", async () => {
+    const provider = createGooglePlanProvider({
+      apiKey: "test-key",
+      model: "gemini-1.5-flash",
+      fetch: async () => new Response("bad", { status: 429 }),
+    });
+
+    await expect(provider.buildPlan({ prompt: "install nginx" })).rejects.toBeInstanceOf(GoogleProviderError);
   });
 });

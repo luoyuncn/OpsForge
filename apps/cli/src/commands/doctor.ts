@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { loadConfig } from "@opsforge/config";
 import type { HostFacts } from "@opsforge/executor-base";
+import { describeProviderCapabilities } from "@opsforge/planner";
 import { type WhichRunner } from "../detect";
 import { detectLocalHostFacts, detectLocalHostFactsAsync, type HostCommandResult } from "../host-facts";
 
@@ -21,6 +22,7 @@ export interface DoctorDeps {
 export interface DoctorReport {
   facts: HostFacts;
   provider: string;
+  providerCapabilities: string[];
   riskMax: string;
   allowShell: boolean;
   warnings: string[];
@@ -55,6 +57,7 @@ const reportFromFacts = (deps: DoctorDeps, facts: HostFacts): DoctorReport => {
   return {
     facts,
     provider,
+    providerCapabilities: describeProviderCapabilities(p),
     riskMax: config.riskMax,
     allowShell: config.allowShell,
     warnings: buildWarnings(facts, provider),
@@ -93,6 +96,9 @@ export function formatDoctorReport(r: DoctorReport): string {
   const warnings = r.warnings.length
     ? ["  Warnings:", ...r.warnings.map((warning) => `    - ${warning}`)]
     : ["  Warnings:         none"];
+  const capabilities = r.providerCapabilities.length
+    ? ["  Provider capabilities:", ...r.providerCapabilities.map((capability) => `    - ${capability}`)]
+    : ["  Provider capabilities:", "    - none"];
 
   return [
     "OpsForge doctor",
@@ -102,6 +108,7 @@ export function formatDoctorReport(r: DoctorReport): string {
     `  Elevated:         ${r.facts.isElevated}`,
     `  Package managers: ${r.facts.packageManagers.length ? r.facts.packageManagers.join(", ") : "（未检测到）"}`,
     `  Provider:         ${r.provider}`,
+    ...capabilities,
     `  Risk max:         ${r.riskMax}`,
     `  Allow shell:      ${r.allowShell}`,
     ...warnings,

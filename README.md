@@ -26,6 +26,7 @@ OpsForge is now being built plan-by-plan on `main`.
 - Plan 19 Pi runtime event bridge: `docs/superpowers/plans/2026-06-23-opsforge-plan-19-pi-runtime-event-bridge.md`
 - Plan 20 TUI keyboard session controls: `docs/superpowers/plans/2026-06-23-opsforge-plan-20-tui-keyboard-session-controls.md`
 - Plan 21 runtime action controller: `docs/superpowers/plans/2026-06-23-opsforge-plan-21-runtime-action-controller.md`
+- Plan 22 provider depth and capabilities: `docs/superpowers/plans/2026-06-23-opsforge-plan-22-provider-depth-capabilities.md`
 - Current implementation status and design alignment: `docs/implementation-status.md`
 - Checked-in Plan schema artifact: `schemas/plan.schema.json`
 
@@ -44,6 +45,8 @@ node apps/cli/dist/index.js run "install nginx" --dry-run
 node apps/cli/dist/index.js run "install nginx" --dry-run --json
 node apps/cli/dist/index.js run "install nginx" --auto-rollback
 node apps/cli/dist/index.js config provider openai-compatible --model gpt-4.1-mini --base-url https://api.openai.com/v1 --api-key-env OPENAI_API_KEY
+node apps/cli/dist/index.js config provider anthropic
+node apps/cli/dist/index.js config provider google
 node apps/cli/dist/index.js config show
 node apps/cli/dist/index.js plan "install nginx" --provider configured --json
 node apps/cli/dist/index.js apply .opsforge-tmp/plan-nginx.json --dry-run

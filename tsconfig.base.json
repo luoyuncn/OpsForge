@@ -20,6 +20,7 @@
       "@opsforge/executor-linux": ["packages/executor-linux/src/index.ts"],
       "@opsforge/executor-windows": ["packages/executor-windows/src/index.ts"],
       "@opsforge/pi-runtime": ["packages/pi-runtime/src/index.ts"],
+      "@opsforge/planner": ["packages/planner/src/index.ts"],
       "@opsforge/policy": ["packages/policy/src/index.ts"],
       "@opsforge/shared": ["packages/shared/src/index.ts"],
       "@opsforge/verifier": ["packages/verifier/src/index.ts"]

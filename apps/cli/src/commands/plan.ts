@@ -50,7 +50,7 @@ export const buildPlanCommand = (deps: BuildPlanCommandDeps = {}): Command => {
     .argument("<prompt>", "Natural language operation goal")
     .option("--json", "输出 JSON", false)
     .option("--out <file>", "将 Plan JSON 写入文件")
-    .option("--provider <mode>", "Provider mode: mock, configured, or openai-compatible", "mock")
+    .option("--provider <mode>", "Provider mode: mock, configured, openai-compatible, anthropic, or google", "mock")
     .option("--model <id>", "Provider model id")
     .option("--base-url <url>", "OpenAI-compatible base URL")
     .option("--api-key-env <name>", "Environment variable that stores the API key")

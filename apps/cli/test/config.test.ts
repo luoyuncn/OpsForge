@@ -45,6 +45,31 @@ describe("buildConfigCommand", () => {
     expect(writes[0]).toContain("Provider configured: openai-compatible");
   });
 
+  it("stores Anthropic and Google providers with provider-specific defaults", async () => {
+    const saved: OpsForgeConfig[] = [];
+    const command = buildConfigCommand({
+      write: () => {},
+      load: async () => baseConfig(),
+      save: async (_path, config) => {
+        saved.push(config);
+      },
+    });
+
+    await command.parseAsync(["provider", "anthropic"], { from: "user" });
+    await command.parseAsync(["provider", "google"], { from: "user" });
+
+    expect(saved[0].provider).toEqual({
+      kind: "anthropic",
+      model: "claude-3-5-sonnet-latest",
+      apiKeyEnv: "ANTHROPIC_API_KEY",
+    });
+    expect(saved[1].provider).toEqual({
+      kind: "google",
+      model: "gemini-1.5-flash",
+      apiKeyEnv: "GEMINI_API_KEY",
+    });
+  });
+
   it("prints config as JSON", async () => {
     const writes: string[] = [];
     const command = buildConfigCommand({

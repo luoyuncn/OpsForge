@@ -47,7 +47,7 @@ export const buildRunCommand = (deps: BuildRunCommandDeps = {}): Command => {
     .option("--risk-max <level>", "允许的最高风险等级", "L3")
     .option("--allow-shell", "允许 shell 逃生舱步骤", false)
     .option("--auto-rollback", "验证或执行失败后自动回滚", false)
-    .option("--provider <mode>", "Provider mode: mock, configured, or openai-compatible", "mock")
+    .option("--provider <mode>", "Provider mode: mock, configured, openai-compatible, anthropic, or google", "mock")
     .option("--model <id>", "Provider model id")
     .option("--base-url <url>", "OpenAI-compatible base URL")
     .option("--api-key-env <name>", "Environment variable that stores the API key")

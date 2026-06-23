@@ -14,6 +14,12 @@ export interface BuildConfigCommandDeps {
   save?: (path: string, config: OpsForgeConfig) => Promise<void>;
 }
 
+const providerDefaults = (kind: ProviderKind): { model: string; apiKeyEnv: string; baseUrl?: string } => {
+  if (kind === "anthropic") return { model: "claude-3-5-sonnet-latest", apiKeyEnv: "ANTHROPIC_API_KEY" };
+  if (kind === "google") return { model: "gemini-1.5-flash", apiKeyEnv: "GEMINI_API_KEY" };
+  return { model: "gpt-4.1-mini", apiKeyEnv: "OPENAI_API_KEY", baseUrl: "https://api.openai.com/v1" };
+};
+
 export const formatConfig = (config: OpsForgeConfig): string => {
   const provider = config.provider;
   return [
@@ -41,23 +47,24 @@ export const buildConfigCommand = (deps: BuildConfigCommandDeps = {}): Command =
   command
     .command("provider")
     .description("配置 planner provider")
-    .argument("<kind>", "Provider kind: openai-compatible")
-    .option("--model <id>", "Provider model id", "gpt-4.1-mini")
-    .option("--base-url <url>", "OpenAI-compatible base URL", "https://api.openai.com/v1")
-    .option("--api-key-env <name>", "Environment variable that stores the API key", "OPENAI_API_KEY")
-    .action(async (kind: ProviderKind, options: { model: string; baseUrl: string; apiKeyEnv: string }) => {
-      if (kind !== "openai-compatible") {
+    .argument("<kind>", "Provider kind: openai-compatible, anthropic, or google")
+    .option("--model <id>", "Provider model id")
+    .option("--base-url <url>", "Provider base URL")
+    .option("--api-key-env <name>", "Environment variable that stores the API key")
+    .action(async (kind: ProviderKind, options: { model?: string; baseUrl?: string; apiKeyEnv?: string }) => {
+      if (!["openai-compatible", "anthropic", "google"].includes(kind)) {
         command.error(`Provider '${kind}' is not implemented yet`);
       }
 
+      const defaults = providerDefaults(kind);
       const current = await load(configPath);
       const next: OpsForgeConfig = {
         ...current,
         provider: {
           kind,
-          model: options.model,
-          baseUrl: options.baseUrl,
-          apiKeyEnv: options.apiKeyEnv,
+          model: options.model ?? defaults.model,
+          ...(options.baseUrl ?? defaults.baseUrl ? { baseUrl: options.baseUrl ?? defaults.baseUrl } : {}),
+          apiKeyEnv: options.apiKeyEnv ?? defaults.apiKeyEnv,
         },
       };
       await save(configPath, next);

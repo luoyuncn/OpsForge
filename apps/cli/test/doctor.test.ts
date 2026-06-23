@@ -21,6 +21,7 @@ describe("buildDoctorReport", () => {
     });
     expect(r.provider).toContain("anthropic");
     expect(r.provider).toContain("claude-opus-4-8");
+    expect(r.providerCapabilities).toContain("native structured prompting");
     expect(r.riskMax).toBe("L3");
     expect(r.warnings).toEqual([]);
   });
@@ -74,6 +75,7 @@ describe("formatDoctorReport", () => {
       provider: "未配置",
       riskMax: "L3",
       allowShell: false,
+      providerCapabilities: ["none"],
       warnings: ["provider is not configured"],
     });
     expect(text).toContain("OpsForge doctor");
@@ -81,6 +83,7 @@ describe("formatDoctorReport", () => {
     expect(text).toContain("Distro:           ubuntu 24.04");
     expect(text).toContain("Elevated:         true");
     expect(text).toContain("Warnings:");
+    expect(text).toContain("Provider capabilities:");
     expect(text).toContain("provider is not configured");
   });
 });

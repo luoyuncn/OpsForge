@@ -33,6 +33,7 @@ Implemented plans:
 - Plan 19: `docs/superpowers/plans/2026-06-23-opsforge-plan-19-pi-runtime-event-bridge.md`
 - Plan 20: `docs/superpowers/plans/2026-06-23-opsforge-plan-20-tui-keyboard-session-controls.md`
 - Plan 21: `docs/superpowers/plans/2026-06-23-opsforge-plan-21-runtime-action-controller.md`
+- Plan 22: `docs/superpowers/plans/2026-06-23-opsforge-plan-22-provider-depth-capabilities.md`
 
 ## Delivered In Plan 1
 
@@ -282,6 +283,20 @@ Implemented plans:
   - Approval and rollback actions resume through injected executor/rollback callbacks, keeping host mutation behind the guarded runtime/core boundary.
   - Missing pending Plan or rollback callback returns recoverable runtime errors instead of falling through silently.
 
+## Delivered In Plan 22
+
+- `@opsforge/planner`
+  - Added Anthropic `/v1/messages` and Google `generateContent` Plan providers with mocked-fetch coverage.
+  - Provider adapters parse provider text content as JSON and still rely on DSL validation before a Plan is accepted.
+  - Added typed provider errors for Anthropic and Google failures.
+  - Added provider capability descriptions for OpenAI-compatible, Anthropic, Google, Pi, and unconfigured states.
+
+- `@opsforge/cli`
+  - `opsforge config provider anthropic` and `opsforge config provider google` now persist provider-specific defaults.
+  - `resolvePlanProvider()` can instantiate configured Anthropic and Google providers with provider-specific env vars.
+  - `opsforge doctor` now reports provider capabilities alongside HostFacts, elevation, risk, shell policy, and warnings.
+  - `plan/run --provider` help text now reflects the implemented provider modes while keeping CLI secondary to the TUI-first path.
+
 ## Design Alignment Check
 
 | Spec Area | Status | Evidence | Notes |
@@ -292,7 +307,7 @@ Implemented plans:
 | §4.2 Linux executor | Partial | `packages/executor-linux` | Compile layer exists for apt/dnf/yum and systemd. Real safe file writing needs a later pass. |
 | §4.3 Windows executor | Partial | `packages/executor-windows`, `apps/cli/src/host-facts.ts` | Compile layer exists for winget/choco and services. Doctor can detect admin status with `net session`; safe UAC elevation flow remains open. |
 | §5 Policy and guard | Partial | `packages/policy` | Deterministic classifier/gate/guards exist. More rules and config knobs are needed. |
-| §6 Planner/provider layer | Partial | `packages/planner`, `packages/config`, `packages/pi-runtime`, `apps/cli/src/provider.ts` | Provider boundary, DSL validation, mock provider, persistent provider config, OpenAI-compatible adapter, typed Pi runtime event bridge, and runtime action controller exist. Anthropic/Google/Pi adapters, JSON retry/tool-call retry loops, model capability checks, and real Pi SDK sessions remain. |
+| §6 Planner/provider layer | Partial | `packages/planner`, `packages/config`, `packages/pi-runtime`, `apps/cli/src/provider.ts`, `apps/cli/src/commands/doctor.ts` | Provider boundary, DSL validation, mock provider, persistent provider config, OpenAI-compatible adapter, Anthropic adapter, Google adapter, provider capability reporting, typed Pi runtime event bridge, and runtime action controller exist. Real Pi SDK sessions, JSON retry/tool-call retry loops, and model discovery remain. |
 | §7.1 TUI mode | Partial | `packages/tui`, `packages/tui/src/plan-card.ts`, `packages/tui/src/timeline.ts`, `packages/tui/src/prompts.ts`, `packages/tui/src/state.ts`, `packages/tui/src/runtime-adapter.ts`, `packages/tui/src/controls.ts`, `packages/pi-runtime/src/actions.ts`, `apps/cli/src/index.ts` | `@opsforge/tui` exists, `opsforge` no-arg enters the TUI path in TTY, a deterministic Plan card can render risk/prechecks/steps/compiled command previews/verifications/rollback preview/explanation, a deterministic execution timeline can render step output/exit codes/verification results/rollback recommendations, inline approval/rollback prompt states can render, a pure event/input reducer can drive those views, runtime events can be adapted into TUI events, keyboard input can emit typed prompt/approval/rollback actions, and runtime action handling can call injected planner/executor/rollback callbacks. The no-arg CLI entry still needs to instantiate the action controller with real provider/core callbacks, and real Pi SDK streaming remains. |
 | §7.2 CLI mode | Partial | `apps/cli/src/commands` | `doctor`, `plan`, `plan --out`, `run`, `apply`, `verify`, `rollback`, `config provider/show`, and `audit ls/show` exist. `doctor` now reports richer HostFacts and readiness warnings; `apply` and `run` support `--auto-rollback`; default verification includes read-only host probes. |
 | §8 Audit | Partial | `packages/audit` | SQLite event store, stored Plan JSON, and stdout/stderr artifacts exist. Rich reports, retention/export, rollback audit views, and TUI timeline consumption remain. |
@@ -310,16 +325,18 @@ The implementation priority is now locked back to the design document's product 
 - Plan 19: Add the typed Pi runtime event bridge and TUI adapter without enabling raw bash.
 - Plan 20: Add real Ink keyboard handling and typed TUI user actions for prompt submission, approvals, L3 reasons, and rollback decisions.
 - Plan 21: Add runtime action handling for prompt, approval, deny, rollback, and rollback-skip actions using injected planner/core callbacks.
-- After Plan 21: continue with provider/Pi SDK depth, safe file write/template semantics, skills, and richer audit/reporting.
+- Plan 22: Add Anthropic/Google provider depth and expose provider capability reporting in doctor.
+- After Plan 22: continue with TUI real runtime wiring, safe file write/template semantics, skills, and richer audit/reporting.
 
 ## Remaining Implementation Estimate
 
-To finish the full Phase 1 MVP described in the design document, the project likely needs roughly 3-4 more plan-sized slices after Plan 21. The immediate remaining tracks are provider/Pi SDK depth, safe file-write/template execution semantics, skill templates, safe elevation flows, and richer audit/export/reporting.
+To finish the full Phase 1 MVP described in the design document, the project likely needs roughly 3 more plan-sized slices after Plan 22. The immediate remaining tracks are wiring the no-arg TUI to real runtime callbacks, safe file-write/template execution semantics, skill templates, safe elevation flows, and richer audit/export/reporting.
 
 ## Known Gaps
 
-- Anthropic, Google, and real Pi planner adapters plus real Pi SDK session integration are not implemented.
+- Real Pi planner adapter and real Pi SDK session integration are not implemented.
 - Planner JSON-mode retry/tool-call retry loops are not implemented.
+- Anthropic and Google provider adapters exist, but provider retry/repair loops and live model discovery are not implemented.
 - TUI primary entry, deterministic state/rendering, runtime-event adaptation, keyboard action emission, and runtime action handling exist, but the no-arg CLI entry does not yet instantiate a real runtime session with provider/core callbacks.
 - TUI inline rollback prompt rendering and rollback key actions exist, and runtime action handling can call an injected rollback callback, but the no-arg TUI entry has not yet wired it to stored audit rollback execution.
 - Verification replay is manual only; no scheduled or automatic verification loop exists yet.
@@ -327,7 +344,7 @@ To finish the full Phase 1 MVP described in the design document, the project lik
 - Rollback reporting is basic and does not yet provide rich rollback views in audit output.
 - Audit retention/export and richer report generation are not implemented.
 - TUI timeline consumption of audit history is not implemented.
-- Model capability checks are not implemented.
+- Provider capability reporting exists in doctor; live model capability checks are not implemented.
 - Only the Plan JSON Schema artifact is exported; job, approval, inventory, and audit schema artifacts remain.
 - Generated plans are persisted as files, not yet in a first-class plan registry.
 - Safe elevation flows are incomplete; current work detects elevated state but does not request or broker elevation.
@@ -335,4 +352,4 @@ To finish the full Phase 1 MVP described in the design document, the project lik
 
 ## Next Plan Recommendation
 
-Plan 22 should focus on provider depth and model capability checks: Anthropic/Google-compatible adapters or provider capability reporting should be added without changing the TUI-first product shape.
+Plan 23 should focus on the TUI-first runtime seam: wire the no-argument TUI entry to the runtime action controller with real planner/core callbacks, while keeping non-TTY CLI fallback intact.
