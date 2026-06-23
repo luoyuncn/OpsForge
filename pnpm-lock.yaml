@@ -81,6 +81,72 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.20.0)
 
+  packages/executor-base:
+    dependencies:
+      '@opsforge/dsl':
+        specifier: workspace:*
+        version: link:../dsl
+      '@opsforge/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@types/node':
+        specifier: ^22.7.0
+        version: 22.20.0
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.1(postcss@8.5.15)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.20.0)
+
+  packages/executor-linux:
+    dependencies:
+      '@opsforge/dsl':
+        specifier: workspace:*
+        version: link:../dsl
+      '@opsforge/executor-base':
+        specifier: workspace:*
+        version: link:../executor-base
+    devDependencies:
+      '@types/node':
+        specifier: ^22.7.0
+        version: 22.20.0
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.1(postcss@8.5.15)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.20.0)
+
+  packages/executor-windows:
+    dependencies:
+      '@opsforge/dsl':
+        specifier: workspace:*
+        version: link:../dsl
+      '@opsforge/executor-base':
+        specifier: workspace:*
+        version: link:../executor-base
+    devDependencies:
+      '@types/node':
+        specifier: ^22.7.0
+        version: 22.20.0
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.1(postcss@8.5.15)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.20.0)
+
   packages/policy:
     dependencies:
       '@opsforge/dsl':
