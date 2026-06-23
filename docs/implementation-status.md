@@ -15,6 +15,7 @@ Implemented plans:
 - Plan 1: `docs/superpowers/plans/2026-06-23-opsforge-plan-1-foundation.md`
 - Plan 2: `docs/superpowers/plans/2026-06-23-opsforge-plan-2-deterministic-pipeline.md`
 - Plan 3: `docs/superpowers/plans/2026-06-23-opsforge-plan-3-audit-persistence.md`
+- Plan 4: `docs/superpowers/plans/2026-06-23-opsforge-plan-4-planner-provider-scaffold.md`
 
 ## Delivered In Plan 1
 
@@ -73,6 +74,19 @@ Implemented plans:
   - `opsforge audit ls` lists persisted runs.
   - `opsforge audit show <run_id>` shows persisted events and step artifact paths.
 
+## Delivered In Plan 4
+
+- `@opsforge/planner`
+  - Provider-independent `PlanProvider` interface for natural-language planning.
+  - `buildPlanFromPrompt()` validates provider output through the DSL schema before returning a Plan.
+  - Stable `PlannerValidationError` for invalid provider output.
+  - Deterministic mock provider that generates install plans such as `install nginx`.
+
+- `@opsforge/cli`
+  - `opsforge plan "<NL>"` emits a compact human-readable Plan summary.
+  - `opsforge plan "<NL>" --json` emits schema-valid Plan JSON.
+  - Plan generation is non-mutating and does not call host executors.
+
 ## Design Alignment Check
 
 | Spec Area | Status | Evidence | Notes |
@@ -83,23 +97,30 @@ Implemented plans:
 | §4.2 Linux executor | Partial | `packages/executor-linux` | Compile layer exists for apt/dnf/yum and systemd. Real safe file writing needs a later pass. |
 | §4.3 Windows executor | Partial | `packages/executor-windows` | Compile layer exists for winget/choco and services. UAC/admin detection remains open. |
 | §5 Policy and guard | Partial | `packages/policy` | Deterministic classifier/gate/guards exist. More rules and config knobs are needed. |
-| §7.2 CLI mode | Partial | `apps/cli/src/commands` | `doctor`, `apply`, and `audit ls/show` exist. `plan/run/verify/rollback/config` remain. |
+| §6 Planner/provider layer | Partial | `packages/planner` | Provider boundary, DSL validation, and mock provider exist. Real OpenAI/Anthropic/Google/Pi adapters, JSON retry, and Pi sessions remain. |
+| §7.2 CLI mode | Partial | `apps/cli/src/commands` | `doctor`, `plan`, `apply`, and `audit ls/show` exist. `run/verify/rollback/config` remain. |
 | §8 Audit | Partial | `packages/audit` | SQLite event store and stdout/stderr artifacts exist. Rich reports, retention/export, rollback audit views, and TUI timeline consumption remain. |
 | §11 Tests | Partial | package tests | Unit tests cover deterministic components and do not mutate the host. |
 
 ## Known Gaps
 
-- LLM planner and Pi runtime are not implemented.
+- Real LLM planner adapters and Pi runtime are not implemented.
+- Planner JSON-mode retry/tool-call retry loops are not implemented.
 - TUI primary entry is not implemented; bare `opsforge` still prints a placeholder.
 - Rollback orchestration and CLI `rollback` are not implemented.
-- CLI `plan`, `run`, `verify`, and `config` subcommands are not implemented.
+- CLI `run`, `verify`, and `config` subcommands are not implemented.
 - Audit retention/export and richer report generation are not implemented.
 - TUI timeline consumption of audit history is not implemented.
-- Provider configuration commands and model capability checks are not implemented.
+- Provider configuration commands, real provider adapters, and model capability checks are not implemented.
 - JSON Schema export from DSL is not implemented.
 - Real elevated privilege detection and safe elevation flows are incomplete.
 - Skill templates such as install-nginx/install-docker/install-nodejs are not implemented.
 
 ## Next Plan Recommendation
 
-Plan 4 should focus on planner/provider scaffolding for `opsforge plan` with a schema-valid mocked provider first, before connecting real LLM providers or the TUI.
+Plan 5 should focus on either:
+
+1. provider configuration commands and a real OpenAI-compatible planner adapter with mocked HTTP tests, or
+2. DSL JSON Schema export plus plan file writing/persistence so generated plans can be saved and applied directly.
+
+The safer next slice is DSL JSON Schema export plus plan file writing because it strengthens the planning artifact boundary before real LLM calls are introduced.
