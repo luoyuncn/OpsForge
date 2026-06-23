@@ -31,6 +31,7 @@ Out of scope:
 ## Files
 
 - Modify: `packages/tui/src/index.tsx`
+- Create: `packages/tui/src/plan-card.ts`
 - Modify: `packages/tui/test/tui.test.ts`
 - Modify: `packages/tui/package.json`
 - Modify: `pnpm-lock.yaml`

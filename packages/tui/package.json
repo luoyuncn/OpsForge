@@ -19,7 +19,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@opsforge/dsl": "workspace:*",
     "@opsforge/executor-base": "workspace:*",
+    "@opsforge/executor-linux": "workspace:*",
+    "@opsforge/executor-windows": "workspace:*",
     "ink": "^5.0.1",
     "react": "^18.3.1"
   },

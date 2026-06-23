@@ -280,9 +280,18 @@ importers:
 
   packages/tui:
     dependencies:
+      '@opsforge/dsl':
+        specifier: workspace:*
+        version: link:../dsl
       '@opsforge/executor-base':
         specifier: workspace:*
         version: link:../executor-base
+      '@opsforge/executor-linux':
+        specifier: workspace:*
+        version: link:../executor-linux
+      '@opsforge/executor-windows':
+        specifier: workspace:*
+        version: link:../executor-windows
       ink:
         specifier: ^5.0.1
         version: 5.2.1(@types/react@18.3.31)(react@18.3.1)
