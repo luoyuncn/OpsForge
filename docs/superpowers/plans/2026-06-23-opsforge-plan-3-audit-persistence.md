@@ -6,7 +6,7 @@
 
 **Architecture:** Keep `@opsforge/audit` as the storage boundary. Add a SQLite-backed recorder beside the existing memory recorder, plus artifact helpers for stdout/stderr dumps. Wire `opsforge apply` to persistent audit by default, while tests can still inject memory storage and fake paths.
 
-**Tech Stack:** TypeScript, pnpm workspace, Turbo, tsup, vitest, zod, commander, better-sqlite3, Node fs/path.
+**Tech Stack:** TypeScript, pnpm workspace, Turbo, tsup, vitest, zod, commander, Node 24 `node:sqlite`, Node fs/path.
 
 **Spec Coverage:** `docs/superpowers/specs/2026-06-23-opsforge-local-ops-agent-design.md` §8.1 SQLite/artifacts, §8.2 append-only audit event model, §7.2 `opsforge audit ls/show`, §11 no-host-mutation tests.
 
@@ -34,22 +34,11 @@ docs/
 ## Task 1: SQLite Audit Store
 
 **Files:**
-- Modify: `packages/audit/package.json`
 - Create: `packages/audit/src/paths.ts`, `packages/audit/src/sqlite.ts`, `packages/audit/src/summary.ts`
 - Modify: `packages/audit/src/index.ts`, `packages/audit/src/events.ts`
 - Test: `packages/audit/test/sqlite.test.ts`
 
-- [ ] **Step 1: Install dependencies**
-
-Run:
-```bash
-pnpm --filter @opsforge/audit add better-sqlite3
-pnpm --filter @opsforge/audit add -D @types/better-sqlite3
-```
-
-Expected: install succeeds and `packages/audit/package.json` includes both dependencies.
-
-- [ ] **Step 2: Write failing SQLite tests**
+- [ ] **Step 1: Write failing SQLite tests**
 
 Create `packages/audit/test/sqlite.test.ts` with tests for:
 
@@ -94,7 +83,7 @@ describe("createSqliteAuditStore", () => {
 Run: `pnpm --filter @opsforge/audit test`
 Expected: FAIL because `createSqliteAuditStore` does not exist.
 
-- [ ] **Step 3: Implement SQLite schema and recorder**
+- [ ] **Step 2: Implement SQLite schema and recorder**
 
 Implement:
 - `plans(plan_id TEXT PRIMARY KEY, intent TEXT, risk TEXT, created_at TEXT)`
@@ -106,8 +95,9 @@ Export:
 - `createSqliteAuditStore({ dbPath, artifactsDir })`
 - `AuditStore` extends `AuditRecorder` with `listRuns()`, `showRun(runId)`, `recordStepArtifacts(runId, stepIndex, stdout, stderr)`, `close()`.
 - `resolveOpsForgePaths(config)` to expand leading `~` using `os.homedir()`.
+- Use Node 24 `node:sqlite` `DatabaseSync`. The original spec mentions `better-sqlite3`; this plan keeps the SQLite storage semantics but avoids a native ClangCL toolchain requirement observed on the current Windows development host.
 
-- [ ] **Step 4: Verify and commit**
+- [ ] **Step 3: Verify and commit**
 
 Run:
 ```bash
