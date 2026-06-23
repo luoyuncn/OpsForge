@@ -1,0 +1,26 @@
+{
+  "name": "@opsforge/cli",
+  "version": "0.0.0",
+  "type": "module",
+  "bin": {
+    "opsforge": "./dist/index.js",
+    "ops": "./dist/index.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@opsforge/config": "workspace:*",
+    "@opsforge/dsl": "workspace:*",
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
