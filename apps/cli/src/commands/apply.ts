@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 import { createSqliteAuditStore, resolveOpsForgePaths, type AuditStore } from "@opsforge/audit";
 import { loadConfig, type OpsForgeConfig } from "@opsforge/config";
 import { executePlan, type ExecutePlanResult } from "@opsforge/core";
-import { parsePlan, type RiskLevel } from "@opsforge/dsl";
+import { parsePlan, type Plan, type RiskLevel } from "@opsforge/dsl";
 import type { CommandRunner, HostFacts, RawCommandResult } from "@opsforge/executor-base";
 import { createLinuxExecutor } from "@opsforge/executor-linux";
 import { createWindowsExecutor } from "@opsforge/executor-windows";
@@ -21,14 +21,17 @@ export interface ApplyOptions {
   allowShell: boolean;
 }
 
-export interface BuildApplyDeps {
-  readFile?: (path: string) => Promise<string>;
+export interface ExecutePlanDeps {
   platform?: NodeJS.Platform;
   facts?: HostFacts;
   which?: WhichRunner;
   runner?: CommandRunner;
   auditStore?: AuditStore;
   config?: OpsForgeConfig;
+}
+
+export interface BuildApplyDeps extends ExecutePlanDeps {
+  readFile?: (path: string) => Promise<string>;
 }
 
 export type ApplyResult = ExecutePlanResult & {
@@ -68,13 +71,11 @@ const factsFromHost = (os: DetectedOs, which: WhichRunner): HostFacts => {
 const executorForFacts = (facts: HostFacts) =>
   facts.osFamily === "windows" ? createWindowsExecutor() : createLinuxExecutor();
 
-export const buildApplyCommand = (deps: BuildApplyDeps = {}) => async (
-  planPath: string,
+export const executeParsedPlan = async (
+  plan: Plan,
   options: ApplyOptions,
+  deps: ExecutePlanDeps = {},
 ): Promise<ApplyResult> => {
-  const readFile = deps.readFile ?? ((path: string) => readFileFromDisk(path, "utf8"));
-  const input = await readFile(planPath);
-  const plan = parsePlan(JSON.parse(input));
   const hostOs = detectOs(deps.platform ?? process.platform);
   const facts = deps.facts ?? factsFromHost(plan.osFamily ?? hostOs, deps.which ?? systemWhich);
   const createdAuditStore = deps.auditStore === undefined;
@@ -102,6 +103,16 @@ export const buildApplyCommand = (deps: BuildApplyDeps = {}) => async (
   } finally {
     if (createdAuditStore) audit.close();
   }
+};
+
+export const buildApplyCommand = (deps: BuildApplyDeps = {}) => async (
+  planPath: string,
+  options: ApplyOptions,
+): Promise<ApplyResult> => {
+  const readFile = deps.readFile ?? ((path: string) => readFileFromDisk(path, "utf8"));
+  const input = await readFile(planPath);
+  const plan = parsePlan(JSON.parse(input));
+  return executeParsedPlan(plan, options, deps);
 };
 
 export const formatApplyResult = (result: ApplyResult): string => {
