@@ -3,11 +3,15 @@ import type { ExecutePlanResult } from "@opsforge/core";
 import type { Plan } from "@opsforge/dsl";
 import type { HostFacts } from "@opsforge/executor-base";
 import {
+  createApprovalPrompt,
   createExecutionTimeline,
+  createRollbackPrompt,
   createTuiPlanCard,
   createTuiStatus,
+  formatApprovalPromptSnapshot,
   formatExecutionTimelineSnapshot,
   formatPlanCardSnapshot,
+  formatRollbackPromptSnapshot,
   formatTuiSnapshot,
 } from "../src/index";
 
@@ -163,6 +167,35 @@ describe("formatTuiSnapshot", () => {
     expect(snapshot).toContain("Verification: pass");
     expect(snapshot).toContain("rollback not needed");
   });
+
+  it("renders inline approval and rollback prompts inside the TUI snapshot", () => {
+    const snapshot = formatTuiSnapshot(createTuiStatus({
+      facts: linuxFacts,
+      provider: "mock",
+      plan: nginxPlan,
+      approval: {
+        planId: "plan_nginx",
+        title: "Install nginx",
+        risk: "L3",
+        interactive: true,
+      },
+      rollbackPrompt: {
+        runId: "run_plan_nginx",
+        rollback: {
+          trigger: "verification-failed",
+          autoExecuted: false,
+          available: true,
+          reason: "rollback recommended after verification-failed",
+          suggestedCommand: "opsforge rollback run_plan_nginx",
+        },
+      },
+    }));
+
+    expect(snapshot).toContain("Approval: required");
+    expect(snapshot).toContain("Reason: required");
+    expect(snapshot).toContain("Rollback prompt: recommended");
+    expect(snapshot).toContain("opsforge rollback run_plan_nginx");
+  });
 });
 
 describe("createTuiPlanCard", () => {
@@ -219,5 +252,141 @@ describe("formatExecutionTimelineSnapshot", () => {
     expect(snapshot).toContain("Verification: pass");
     expect(snapshot).toContain("service nginx status active");
     expect(snapshot).toContain("Rollback: rollback not needed");
+  });
+});
+
+describe("createApprovalPrompt", () => {
+  it("bypasses low-risk plans", () => {
+    const prompt = createApprovalPrompt({
+      planId: "plan_nginx",
+      title: "Install nginx",
+      risk: "L1",
+      interactive: true,
+    });
+
+    expect(prompt.required).toBe(false);
+    expect(prompt.status).toBe("bypassed");
+  });
+
+  it("requires inline approve or deny for L2 plans", () => {
+    const prompt = createApprovalPrompt({
+      planId: "plan_config",
+      title: "Update config",
+      risk: "L2",
+      interactive: true,
+    });
+
+    expect(prompt.required).toBe(true);
+    expect(prompt.reasonRequired).toBe(false);
+    expect(prompt.actions).toEqual(["approve", "deny"]);
+  });
+
+  it("requires a reason for L3 plans", () => {
+    const prompt = createApprovalPrompt({
+      planId: "plan_shell",
+      title: "Run guarded shell",
+      risk: "L3",
+      interactive: true,
+    });
+
+    expect(prompt.required).toBe(true);
+    expect(prompt.reasonRequired).toBe(true);
+    expect(prompt.reasonLabel).toBe("Approval reason");
+  });
+
+  it("shows non-interactive denial fallback for high-risk plans", () => {
+    const snapshot = formatApprovalPromptSnapshot(createApprovalPrompt({
+      planId: "plan_config",
+      title: "Update config",
+      risk: "L2",
+      interactive: false,
+    }));
+
+    expect(snapshot).toContain("Approval: non-interactive-denied");
+    expect(snapshot).toContain("denied unless explicitly approved");
+  });
+});
+
+describe("createRollbackPrompt", () => {
+  it("prompts for recommended rollback", () => {
+    const prompt = createRollbackPrompt({
+      runId: "run_plan_nginx",
+      rollback: {
+        trigger: "step-failed",
+        autoExecuted: false,
+        available: true,
+        reason: "rollback recommended after step-failed",
+        suggestedCommand: "opsforge rollback run_plan_nginx",
+      },
+    });
+
+    expect(prompt.required).toBe(true);
+    expect(prompt.status).toBe("recommended");
+    expect(prompt.actions).toEqual(["rollback", "skip"]);
+    expect(prompt.suggestedCommand).toBe("opsforge rollback run_plan_nginx");
+  });
+
+  it("does not offer rollback action when unavailable", () => {
+    const prompt = createRollbackPrompt({
+      runId: "run_plan_nginx",
+      rollback: {
+        trigger: "verification-failed",
+        autoExecuted: false,
+        available: false,
+        reason: "rollback unavailable: plan has no rollback steps",
+      },
+    });
+
+    expect(prompt.required).toBe(false);
+    expect(prompt.status).toBe("unavailable");
+    expect(prompt.actions).toEqual([]);
+  });
+
+  it("marks auto-executed rollback as already handled", () => {
+    const prompt = createRollbackPrompt({
+      runId: "run_plan_nginx",
+      rollback: {
+        trigger: "step-failed",
+        autoExecuted: true,
+        available: true,
+        reason: "rollback executed after step-failed",
+      },
+    });
+
+    expect(prompt.required).toBe(false);
+    expect(prompt.status).toBe("auto-executed");
+  });
+
+  it("bypasses rollback prompt when rollback is not needed", () => {
+    const prompt = createRollbackPrompt({
+      runId: "run_plan_nginx",
+      rollback: {
+        autoExecuted: false,
+        available: false,
+        reason: "rollback not needed",
+      },
+    });
+
+    expect(prompt.required).toBe(false);
+    expect(prompt.status).toBe("not-needed");
+  });
+});
+
+describe("formatRollbackPromptSnapshot", () => {
+  it("renders recommended rollback command and actions", () => {
+    const snapshot = formatRollbackPromptSnapshot(createRollbackPrompt({
+      runId: "run_plan_nginx",
+      rollback: {
+        trigger: "verification-failed",
+        autoExecuted: false,
+        available: true,
+        reason: "rollback recommended after verification-failed",
+        suggestedCommand: "opsforge rollback run_plan_nginx",
+      },
+    }));
+
+    expect(snapshot).toContain("Rollback prompt: recommended");
+    expect(snapshot).toContain("Actions: rollback, skip");
+    expect(snapshot).toContain("opsforge rollback run_plan_nginx");
   });
 });

@@ -9,6 +9,16 @@ import {
   type TuiPlanCard,
 } from "./plan-card";
 import {
+  createApprovalPrompt,
+  createRollbackPrompt,
+  formatApprovalPromptSnapshot,
+  formatRollbackPromptSnapshot,
+  type ApprovalPromptInput,
+  type RollbackPromptInput,
+  type TuiApprovalPrompt,
+  type TuiRollbackPrompt,
+} from "./prompts";
+import {
   createExecutionTimeline,
   formatExecutionTimelineSnapshot,
   type TuiExecutionTimeline,
@@ -21,6 +31,18 @@ export {
   type TuiPlanCard,
   type TuiPlanStepPreview,
 } from "./plan-card";
+export {
+  createApprovalPrompt,
+  createRollbackPrompt,
+  formatApprovalPromptSnapshot,
+  formatRollbackPromptSnapshot,
+  type ApprovalPromptInput,
+  type RollbackPromptInput,
+  type TuiApprovalPrompt,
+  type TuiRollbackPrompt,
+  type TuiApprovalStatus,
+  type TuiRollbackStatus,
+} from "./prompts";
 export {
   createExecutionTimeline,
   formatExecutionTimelineSnapshot,
@@ -38,6 +60,8 @@ export interface TuiStatus {
   auditLabel: string;
   planCard?: TuiPlanCard;
   timeline?: TuiExecutionTimeline;
+  approvalPrompt?: TuiApprovalPrompt;
+  rollbackPrompt?: TuiRollbackPrompt;
 }
 
 export interface TuiLaunchOptions {
@@ -48,6 +72,8 @@ export interface TuiLaunchOptions {
   auditLabel?: string;
   plan?: Plan;
   execution?: ExecutePlanResult;
+  approval?: ApprovalPromptInput;
+  rollbackPrompt?: RollbackPromptInput;
 }
 
 export const createTuiStatus = (options: TuiLaunchOptions): TuiStatus => ({
@@ -58,6 +84,8 @@ export const createTuiStatus = (options: TuiLaunchOptions): TuiStatus => ({
   auditLabel: options.auditLabel ?? "default",
   planCard: options.plan ? createTuiPlanCard(options.plan, options.facts) : undefined,
   timeline: options.execution ? createExecutionTimeline(options.execution) : undefined,
+  approvalPrompt: options.approval ? createApprovalPrompt(options.approval) : undefined,
+  rollbackPrompt: options.rollbackPrompt ? createRollbackPrompt(options.rollbackPrompt) : undefined,
 });
 
 const formatDistro = (facts: HostFacts): string => {
@@ -81,6 +109,8 @@ export const formatTuiSnapshot = (status: TuiStatus): string => [
   `Audit: ${status.auditLabel}`,
   status.planCard ? formatPlanCardSnapshot(status.planCard) : "Timeline: waiting for a task",
   status.timeline ? formatExecutionTimelineSnapshot(status.timeline) : undefined,
+  status.approvalPrompt ? formatApprovalPromptSnapshot(status.approvalPrompt) : undefined,
+  status.rollbackPrompt ? formatRollbackPromptSnapshot(status.rollbackPrompt) : undefined,
   "Ask Forge >",
 ].filter((line): line is string => Boolean(line)).join("\n");
 
@@ -110,6 +140,8 @@ export const TuiApp = ({ status }: TuiAppProps): React.ReactElement => (
         </>
       )}
       {status.timeline ? <ExecutionTimelineView timeline={status.timeline} /> : null}
+      {status.approvalPrompt ? <ApprovalPromptView prompt={status.approvalPrompt} /> : null}
+      {status.rollbackPrompt ? <RollbackPromptView prompt={status.rollbackPrompt} /> : null}
     </Box>
     <Box marginTop={1}>
       <Text color="green">Ask Forge &gt; </Text>
@@ -203,7 +235,43 @@ const ExecutionTimelineView = ({ timeline }: ExecutionTimelineViewProps): React.
   </Box>
 );
 
-export const runTui = (options: TuiLaunchOptions): void => {
-  const status = createTuiStatus(options);
+interface ApprovalPromptViewProps {
+  prompt: TuiApprovalPrompt;
+}
+
+const ApprovalPromptView = ({ prompt }: ApprovalPromptViewProps): React.ReactElement => (
+  <Box marginTop={1} flexDirection="column">
+    <Text bold>Approval: {prompt.status}</Text>
+    <Text>Plan: {prompt.title}</Text>
+    <Text>Risk: {prompt.risk}</Text>
+    <Text>Required: {String(prompt.required)}</Text>
+    <Text>Reason: {prompt.reasonRequired ? "required" : "not required"}</Text>
+    {prompt.reasonLabel ? <Text>Reason label: {prompt.reasonLabel}</Text> : null}
+    <Text>{prompt.message}</Text>
+    <Text>Actions: {prompt.actions.length ? prompt.actions.join(", ") : "none"}</Text>
+  </Box>
+);
+
+interface RollbackPromptViewProps {
+  prompt: TuiRollbackPrompt;
+}
+
+const RollbackPromptView = ({ prompt }: RollbackPromptViewProps): React.ReactElement => (
+  <Box marginTop={1} flexDirection="column">
+    <Text bold>Rollback prompt: {prompt.status}</Text>
+    <Text>Run: {prompt.runId}</Text>
+    <Text>Required: {String(prompt.required)}</Text>
+    {prompt.trigger ? <Text>Trigger: {prompt.trigger}</Text> : null}
+    <Text>Reason: {prompt.reason}</Text>
+    <Text>Actions: {prompt.actions.length ? prompt.actions.join(", ") : "none"}</Text>
+    {prompt.suggestedCommand ? <Text>Command: {prompt.suggestedCommand}</Text> : null}
+  </Box>
+);
+
+const isTuiStatus = (options: TuiLaunchOptions | TuiStatus): options is TuiStatus =>
+  "planCard" in options || "timeline" in options || "approvalPrompt" in options || "rollbackPrompt" in options;
+
+export const runTui = (options: TuiLaunchOptions | TuiStatus): void => {
+  const status = isTuiStatus(options) ? options : createTuiStatus(options);
   render(<TuiApp status={status} />);
 };

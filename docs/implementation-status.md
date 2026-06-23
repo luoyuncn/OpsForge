@@ -28,6 +28,7 @@ Implemented plans:
 - Plan 14: `docs/superpowers/plans/2026-06-23-opsforge-plan-14-tui-foundation.md`
 - Plan 15: `docs/superpowers/plans/2026-06-23-opsforge-plan-15-tui-plan-card.md`
 - Plan 16: `docs/superpowers/plans/2026-06-23-opsforge-plan-16-tui-execution-timeline.md`
+- Plan 17: `docs/superpowers/plans/2026-06-23-opsforge-plan-17-tui-inline-approval-rollback-prompts.md`
 
 ## Delivered In Plan 1
 
@@ -232,6 +233,14 @@ Implemented plans:
   - Rollback outcomes render as not-needed, recommended, unavailable, or auto-executed status with suggested rollback command when present.
   - The TUI shell can now carry an optional execution result and render the timeline after the Plan card.
 
+## Delivered In Plan 17
+
+- `@opsforge/tui`
+  - Added deterministic inline approval prompt models for L0/L1 bypass, L2 approve/deny, L3 approve/deny with required reason, and non-interactive high-risk denial fallback.
+  - Added deterministic rollback prompt models for recommended, unavailable, auto-executed, and not-needed rollback outcomes.
+  - Added snapshot formatters for approval and rollback prompts so future Pi/core event wiring has stable rendering targets.
+  - The TUI shell can now carry optional approval and rollback prompt states and render them inline after the Plan card and execution timeline.
+
 ## Design Alignment Check
 
 | Spec Area | Status | Evidence | Notes |
@@ -243,7 +252,7 @@ Implemented plans:
 | §4.3 Windows executor | Partial | `packages/executor-windows`, `apps/cli/src/host-facts.ts` | Compile layer exists for winget/choco and services. Doctor can detect admin status with `net session`; safe UAC elevation flow remains open. |
 | §5 Policy and guard | Partial | `packages/policy` | Deterministic classifier/gate/guards exist. More rules and config knobs are needed. |
 | §6 Planner/provider layer | Partial | `packages/planner`, `packages/config`, `apps/cli/src/provider.ts` | Provider boundary, DSL validation, mock provider, persistent provider config, and OpenAI-compatible adapter exist. Anthropic/Google/Pi adapters, JSON retry/tool-call retry loops, model capability checks, and Pi sessions remain. |
-| §7.1 TUI mode | Partial | `packages/tui`, `packages/tui/src/plan-card.ts`, `packages/tui/src/timeline.ts`, `apps/cli/src/index.ts` | `@opsforge/tui` exists, `opsforge` no-arg enters the TUI path in TTY, a deterministic Plan card can render risk/prechecks/steps/compiled command previews/verifications/rollback preview/explanation, and a deterministic execution timeline can render step output, exit codes, verification results, and rollback recommendations. Inline approvals, interactive rollback choice, and Pi event streaming remain. |
+| §7.1 TUI mode | Partial | `packages/tui`, `packages/tui/src/plan-card.ts`, `packages/tui/src/timeline.ts`, `packages/tui/src/prompts.ts`, `apps/cli/src/index.ts` | `@opsforge/tui` exists, `opsforge` no-arg enters the TUI path in TTY, a deterministic Plan card can render risk/prechecks/steps/compiled command previews/verifications/rollback preview/explanation, a deterministic execution timeline can render step output/exit codes/verification results/rollback recommendations, and inline approval/rollback prompt states can render in the TUI. Live keyboard handling, pipeline pause/resume wiring, interactive rollback execution, and Pi event streaming remain. |
 | §7.2 CLI mode | Partial | `apps/cli/src/commands` | `doctor`, `plan`, `plan --out`, `run`, `apply`, `verify`, `rollback`, `config provider/show`, and `audit ls/show` exist. `doctor` now reports richer HostFacts and readiness warnings; `apply` and `run` support `--auto-rollback`; default verification includes read-only host probes. |
 | §8 Audit | Partial | `packages/audit` | SQLite event store, stored Plan JSON, and stdout/stderr artifacts exist. Rich reports, retention/export, rollback audit views, and TUI timeline consumption remain. |
 | §11 Tests | Partial | package tests | Unit tests cover deterministic components, all current verifier variants, default verifier probe command generation, local TCP port checks, HostFacts detection, doctor warnings, TUI snapshot rendering, and no-arg TUI entry decisions without mutating the host. |
@@ -256,19 +265,20 @@ The implementation priority is now locked back to the design document's product 
 - Plan 15: TUI plan card with risk, steps, verifications, rollback preview, and compiled-command preview.
 - Plan 16: TUI execution timeline with step output, verification results, and rollback recommendation display.
 - Plan 17: TUI inline approval and rollback prompt flow for L2/L3 and failed runs.
-- After Plan 17: return to provider depth, Pi runtime, safe file write/template semantics, skills, and richer audit/reporting.
+- Plan 18: Wire TUI event stream/input state so Plan card, timeline, approvals, and rollback prompts can be driven by live core/Pi events.
+- After Plan 18: return to provider depth, Pi runtime, safe file write/template semantics, skills, and richer audit/reporting.
 
 ## Remaining Implementation Estimate
 
-To finish the full Phase 1 MVP described in the design document, the project likely needs roughly 4-8 more plan-sized slices after Plan 16. The immediate remaining track is TUI interaction depth: inline approvals, rollback choice, and Pi event streaming. After that, the major tracks are provider depth, Pi runtime integration, safe file-write/template execution semantics, skill templates, safe elevation flows, and richer audit/export/reporting.
+To finish the full Phase 1 MVP described in the design document, the project likely needs roughly 4-7 more plan-sized slices after Plan 17. The immediate remaining track is live TUI wiring: keyboard handling, pipeline pause/resume, interactive rollback execution, and Pi/core event streaming. After that, the major tracks are provider depth, Pi runtime integration, safe file-write/template execution semantics, skill templates, safe elevation flows, and richer audit/export/reporting.
 
 ## Known Gaps
 
 - Anthropic, Google, and Pi planner adapters plus Pi runtime are not implemented.
 - Planner JSON-mode retry/tool-call retry loops are not implemented.
 - TUI primary entry exists, but the TUI is still a foundation shell rather than the full plan/execute/approve experience.
-- TUI inline rollback choice after failure is not implemented.
-- TUI inline approval flow is not implemented.
+- TUI prompt rendering exists, but live keyboard handling and pipeline pause/resume for approvals are not implemented.
+- TUI inline rollback prompt rendering exists, but executing the chosen rollback action from the TUI is not implemented.
 - Verification replay is manual only; no scheduled or automatic verification loop exists yet.
 - Default verifier probes and HostFacts detection are basic; package-manager edge cases, distro-specific nuance, and safe elevation flows remain open.
 - Rollback reporting is basic and does not yet provide rich rollback views in audit output.
@@ -282,4 +292,4 @@ To finish the full Phase 1 MVP described in the design document, the project lik
 
 ## Next Plan Recommendation
 
-Plan 17 should focus on TUI inline approval and rollback prompts. It should model L2/L3 approve/deny states, L3 reason capture, non-interactive fallback semantics, and failed-run rollback choices as deterministic TUI state before wiring them into live Pi/core events.
+Plan 18 should focus on live TUI event/input wiring. It should connect deterministic Plan card, timeline, approval prompt, and rollback prompt models to a local event stream and explicit keyboard/input state without changing the CLI-first subcommands.
