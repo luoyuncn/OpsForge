@@ -14,7 +14,7 @@
 
 This plan advances §7.1, §7.2, §8, and §12:
 
-- TUI remains the primary product surface: users can press `h` to load recent audit history and press `1`-`9` to open a run detail.
+- TUI remains the primary product surface: users can type `/history` to load recent audit history and `/audit 1` through `/audit 9` to open a listed run detail without stealing normal prompt input.
 - Audit reports include plan title/intent, risk/status, event order, step exits, artifact paths, verification/rollback event counts, and stored rollback availability.
 - CLI audit output/export uses the same model as a secondary/scriptable surface.
 

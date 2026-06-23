@@ -674,6 +674,19 @@ describe("reduceTuiKeyInput", () => {
     expect(result.action).toEqual({ type: "submit.prompt", prompt: "in" });
   });
 
+  it("keeps plain h and pasted text as prompt input instead of global shortcuts", () => {
+    let state = createInitialTuiState(createTuiStatus({ facts: linuxFacts, provider: "mock" }));
+    let result = reduceTuiKeyInput(state, "h", {});
+    result = reduceTuiKeyInput(result.state, "ello", {});
+    result = reduceTuiKeyInput(result.state, " 安装 nginx", {});
+
+    state = result.state;
+
+    expect(result.action).toBeUndefined();
+    expect(state.input.draft).toBe("hello 安装 nginx");
+    expect(state.status.inputDraft).toBe("hello 安装 nginx");
+  });
+
   it("emits approve and deny actions for L2 approval prompts", () => {
     let state = createInitialTuiState(createTuiStatus({ facts: linuxFacts, provider: "mock" }));
     state = reduceTuiEvent(state, {
@@ -723,12 +736,15 @@ describe("reduceTuiKeyInput", () => {
     expect(reduceTuiKeyInput(state, "s", {}).action).toEqual({ type: "rollback.skip", runId: "run_plan_nginx" });
   });
 
-  it("emits audit history and run-open actions", () => {
+  it("emits audit history and run-open actions from slash commands", () => {
     let state = createInitialTuiState(createTuiStatus({ facts: linuxFacts, provider: "mock" }));
 
-    expect(reduceTuiKeyInput(state, "h", {}).action).toEqual({ type: "audit.history.load" });
+    state = reduceTuiKeyInput(state, "/history", {}).state;
+    const historyResult = reduceTuiKeyInput(state, "", { return: true });
+    expect(historyResult.action).toEqual({ type: "audit.history.load" });
+    expect(historyResult.state.input.draft).toBe("");
 
-    state = reduceTuiEvent(state, {
+    state = reduceTuiEvent(historyResult.state, {
       type: "audit.history.loaded",
       history: {
         runs: [
@@ -744,6 +760,7 @@ describe("reduceTuiKeyInput", () => {
       },
     });
 
-    expect(reduceTuiKeyInput(state, "1", {}).action).toEqual({ type: "audit.run.open", runId: "run_1" });
+    state = reduceTuiKeyInput(state, "/audit 1", {}).state;
+    expect(reduceTuiKeyInput(state, "", { return: true }).action).toEqual({ type: "audit.run.open", runId: "run_1" });
   });
 });

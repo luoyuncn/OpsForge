@@ -24,7 +24,7 @@ export interface TuiKeyInputResult {
 }
 
 const appendInput = (state: TuiState, input: string): TuiState =>
-  input && input.length === 1
+  input
     ? reduceTuiEvent(state, { type: "input.changed", draft: `${state.input.draft}${input}` })
     : state;
 
@@ -70,20 +70,25 @@ const handleApprovalInput = (state: TuiState, input: string, key: TuiKeyInput): 
       }
       : { state };
   }
-  if (input && input.length === 1) {
+  if (input) {
     return { state: withApprovalReasonDraft(state, `${state.controls.approvalReasonDraft}${input}`) };
   }
   return { state };
 };
 
-const handleAuditInput = (state: TuiState, input: string): TuiKeyInputResult | undefined => {
-  if (state.input.draft) return undefined;
-  if (input.toLowerCase() === "h") return { state, action: { type: "audit.history.load" } };
-  if (/^[1-9]$/.test(input)) {
-    const run = state.status.auditHistory?.runs[Number(input) - 1];
-    return run ? { state, action: { type: "audit.run.open", runId: run.runId } } : { state };
+const slashCommandAction = (state: TuiState, prompt: string): TuiUserAction | undefined => {
+  const command = prompt.trim();
+  if (command === "/history") return { type: "audit.history.load" };
+
+  const auditMatch = /^\/audit\s+(.+)$/i.exec(command);
+  if (!auditMatch) return undefined;
+
+  const selector = auditMatch[1].trim();
+  if (/^[1-9]$/.test(selector)) {
+    const run = state.status.auditHistory?.runs[Number(selector) - 1];
+    return run ? { type: "audit.run.open", runId: run.runId } : undefined;
   }
-  return undefined;
+  return { type: "audit.run.open", runId: selector };
 };
 
 export const reduceTuiKeyInput = (
@@ -99,14 +104,13 @@ export const reduceTuiKeyInput = (
   const approval = handleApprovalInput(state, input, key);
   if (approval) return approval;
 
-  const audit = handleAuditInput(state, input);
-  if (audit) return audit;
-
   if (key.backspace || key.delete) return { state: removeLastInput(state) };
   if (key.return) {
     const prompt = state.input.draft.trim();
     if (!prompt) return { state };
     const next = reduceTuiEvent(state, { type: "input.submitted" });
+    const action = slashCommandAction(state, prompt);
+    if (action) return { state: next, action };
     return { state: next, action: { type: "submit.prompt", prompt } };
   }
 

@@ -376,7 +376,7 @@ Implemented plans:
 
 - `@opsforge/tui`
   - Added audit history and audit detail view models/rendering to the TUI status, reducer, snapshots, and Ink shell.
-  - Added keyboard actions for the primary TUI path: press `h` with an empty prompt to load audit history, then press `1`-`9` to open a listed run.
+  - Added slash-command actions for the primary TUI path: type `/history` to load audit history, then `/audit 1` through `/audit 9` to open a listed run without stealing normal prompt input.
 
 - `@opsforge/cli`
   - No-argument TUI runtime handling now maps audit history/detail actions to the configured `AuditStore`.
