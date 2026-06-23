@@ -1,8 +1,16 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createSqliteAuditStore, resolveOpsForgePaths } from "../src/index";
+
+const require = createRequire(import.meta.url);
+const { DatabaseSync } = require("node:sqlite") as { DatabaseSync: new (path: string) => {
+  exec(sql: string): void;
+  prepare(sql: string): { run(...values: unknown[]): unknown };
+  close(): void;
+} };
 
 let dir = "";
 
@@ -40,6 +48,75 @@ describe("createSqliteAuditStore", () => {
       "plan.created",
       "job.dispatched",
       "run.step.finished",
+    ]);
+
+    store.close();
+  });
+
+  it("keeps repeated plan events scoped to the run that dispatched them", () => {
+    const store = createSqliteAuditStore({ dbPath: join(dir, "opsforge.db"), artifactsDir: join(dir, "artifacts") });
+    store.record({ type: "plan.created", at: "2026-06-23T00:00:00Z", payload: { planId: "p1", intent: "install", risk: "L1" } });
+    store.record({ type: "job.dispatched", at: "2026-06-23T00:00:01Z", payload: { runId: "r1", planId: "p1" } });
+    store.record({ type: "run.dry_run.finished", at: "2026-06-23T00:00:02Z", payload: { runId: "r1" } });
+
+    store.record({ type: "plan.created", at: "2026-06-23T00:01:00Z", payload: { planId: "p1", intent: "install", risk: "L1" } });
+    store.record({ type: "job.dispatched", at: "2026-06-23T00:01:01Z", payload: { runId: "r2", planId: "p1" } });
+    store.record({ type: "run.dry_run.finished", at: "2026-06-23T00:01:02Z", payload: { runId: "r2" } });
+
+    expect(store.showRun("r2")?.events.map((event) => event.at)).toEqual([
+      "2026-06-23T00:01:00Z",
+      "2026-06-23T00:01:01Z",
+      "2026-06-23T00:01:02Z",
+    ]);
+
+    store.close();
+  });
+
+  it("does not attach legacy unscoped plan events to a later run", () => {
+    const dbPath = join(dir, "opsforge.db");
+    const artifactsDir = join(dir, "artifacts");
+    const seedStore = createSqliteAuditStore({ dbPath, artifactsDir });
+    seedStore.close();
+
+    const db = new DatabaseSync(dbPath);
+    db.prepare("INSERT INTO plans (plan_id, intent, risk, created_at) VALUES (?, ?, ?, ?)").run(
+      "p1",
+      "install",
+      "L1",
+      "2026-06-23T00:00:00Z",
+    );
+    db.prepare("INSERT INTO runs (run_id, plan_id, status, started_at, ended_at) VALUES (?, ?, ?, ?, ?)").run(
+      "r1",
+      "p1",
+      "dry_run",
+      "2026-06-23T00:00:01Z",
+      "2026-06-23T00:00:02Z",
+    );
+    db.prepare("INSERT INTO audit_events (run_id, plan_id, type, at, payload_json) VALUES (?, ?, ?, ?, ?)").run(
+      null,
+      "p1",
+      "plan.created",
+      "2026-06-23T00:00:00Z",
+      JSON.stringify({ planId: "p1", intent: "install", risk: "L1" }),
+    );
+    db.prepare("INSERT INTO audit_events (run_id, plan_id, type, at, payload_json) VALUES (?, ?, ?, ?, ?)").run(
+      "r1",
+      "p1",
+      "job.dispatched",
+      "2026-06-23T00:00:01Z",
+      JSON.stringify({ runId: "r1", planId: "p1" }),
+    );
+    db.close();
+
+    const store = createSqliteAuditStore({ dbPath, artifactsDir });
+    store.record({ type: "plan.created", at: "2026-06-23T00:01:00Z", payload: { planId: "p1", intent: "install", risk: "L1" } });
+    store.record({ type: "job.dispatched", at: "2026-06-23T00:01:01Z", payload: { runId: "r2", planId: "p1" } });
+    store.record({ type: "run.dry_run.finished", at: "2026-06-23T00:01:02Z", payload: { runId: "r2" } });
+
+    expect(store.showRun("r2")?.events.map((event) => event.at)).toEqual([
+      "2026-06-23T00:01:00Z",
+      "2026-06-23T00:01:01Z",
+      "2026-06-23T00:01:02Z",
     ]);
 
     store.close();

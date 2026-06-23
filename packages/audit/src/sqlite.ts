@@ -150,6 +150,16 @@ export const createSqliteAuditStore = (options: CreateSqliteAuditStoreOptions): 
     "INSERT OR REPLACE INTO runs (run_id, plan_id, status, started_at, ended_at) VALUES (?, ?, ?, ?, ?)",
   );
   const updateRunStatus = db.prepare("UPDATE runs SET status = ?, ended_at = COALESCE(?, ended_at) WHERE run_id = ?");
+  const assignPendingPlanEvents = db.prepare(
+    `UPDATE audit_events
+     SET run_id = ?
+     WHERE plan_id = ?
+       AND run_id IS NULL
+       AND id > COALESCE(
+         (SELECT MAX(id) FROM audit_events WHERE plan_id = ? AND type = 'job.dispatched' AND run_id <> ?),
+         0
+       )`,
+  );
   const upsertStepRun = db.prepare(
     `INSERT INTO step_runs (run_id, step_index, step_json, exit_code, stdout_path, stderr_path)
      VALUES (?, ?, ?, ?, NULL, NULL)
@@ -183,6 +193,7 @@ export const createSqliteAuditStore = (options: CreateSqliteAuditStoreOptions): 
 
       if (event.type === "job.dispatched") {
         insertRun.run(event.payload.runId, event.payload.planId, "running", event.at, null);
+        assignPendingPlanEvents.run(event.payload.runId, event.payload.planId, event.payload.planId, event.payload.runId);
       }
 
       if (event.type === "run.step.finished") {
@@ -236,8 +247,8 @@ export const createSqliteAuditStore = (options: CreateSqliteAuditStoreOptions): 
       if (!row) return undefined;
 
       const events = (db.prepare(
-        "SELECT type, at, payload_json FROM audit_events WHERE run_id = ? OR plan_id = ? ORDER BY id",
-      ).all(runId, row.plan_id) as unknown as EventRow[]).map((eventRow) => ({
+        "SELECT type, at, payload_json FROM audit_events WHERE run_id = ? ORDER BY id",
+      ).all(runId) as unknown as EventRow[]).map((eventRow) => ({
         type: eventRow.type,
         at: eventRow.at,
         payload: JSON.parse(eventRow.payload_json),
