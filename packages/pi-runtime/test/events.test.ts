@@ -120,6 +120,26 @@ describe("createRuntimeActionController", () => {
     expect(events.map((event) => event.type)).toContain("runtime.execution.finished");
   });
 
+  it("emits rollback prompts after execution recommends rollback", async () => {
+    const controller = createRuntimeActionController({
+      buildPlan: async () => plan,
+      executePlan: async () => execution,
+    });
+
+    const events = await controller.handle({ type: "submit.prompt", prompt: "install nginx" });
+
+    expect(events.map((event) => event.type)).toEqual([
+      "runtime.thinking.delta",
+      "runtime.plan.ready",
+      "runtime.execution.finished",
+      "runtime.rollback.requested",
+    ]);
+    expect(events.at(-1)).toMatchObject({
+      type: "runtime.rollback.requested",
+      rollbackPrompt: { runId: "run_plan_nginx" },
+    });
+  });
+
   it("resumes execution after approval", async () => {
     const highRiskPlan: Plan = { ...plan, risk: "L2", steps: [{ type: "file-write", path: "/etc/example", content: "ok" }] };
     const controller = createRuntimeActionController({
@@ -130,13 +150,17 @@ describe("createRuntimeActionController", () => {
 
     const events = await controller.handle({ type: "approval.approve", planId: "plan_nginx", reason: "needed" });
 
-    expect(events.map((event) => event.type)).toEqual(["runtime.thinking.delta", "runtime.execution.finished"]);
+    expect(events.map((event) => event.type)).toEqual(["runtime.thinking.delta", "runtime.execution.finished", "runtime.rollback.requested"]);
   });
 
   it("calls injected rollback handler for rollback actions", async () => {
     const controller = createRuntimeActionController({
       buildPlan: async () => plan,
-      rollbackRun: async (runId) => ({ ...execution, runId }),
+      rollbackRun: async (runId) => ({
+        ...execution,
+        runId,
+        rollback: { autoExecuted: false, available: false, reason: "rollback not needed" },
+      }),
     });
 
     const events = await controller.handle({ type: "rollback.run", runId: "run_plan_nginx" });

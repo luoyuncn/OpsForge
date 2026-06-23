@@ -1,10 +1,11 @@
+import { createSqliteAuditStore, resolveOpsForgePaths, type AuditStore } from "@opsforge/audit";
 import { loadConfigFile, type OpsForgeConfig } from "@opsforge/config";
 import type { Plan } from "@opsforge/dsl";
 import type { HostFacts } from "@opsforge/executor-base";
 import { createRuntimeActionController, type RuntimeEvent } from "@opsforge/pi-runtime";
 import { buildPlanFromPrompt, type PlanProvider } from "@opsforge/planner";
 import { runtimeEventToTuiEvent, type TuiActionHandler, type TuiEvent } from "@opsforge/tui";
-import { executeParsedPlan, parseRiskMax, type ApplyResult, type ExecutePlanDeps } from "./commands/apply";
+import { executeParsedPlan, executeRollbackPlan, parseRiskMax, type ApplyResult, type ExecutePlanDeps } from "./commands/apply";
 import { resolvePlanProvider, type PlanProviderResolver } from "./provider";
 
 export interface CreateTuiRuntimeActionHandlerDeps extends ExecutePlanDeps {
@@ -17,6 +18,7 @@ export interface CreateTuiRuntimeActionHandlerDeps extends ExecutePlanDeps {
   now?: () => string;
   planId?: () => string;
   execute?: (plan: Plan) => Promise<ApplyResult>;
+  rollback?: (runId: string) => Promise<ApplyResult>;
 }
 
 const runtimeEventsToTuiEvents = (events: readonly RuntimeEvent[]): TuiEvent[] =>
@@ -54,6 +56,42 @@ export const createTuiRuntimeActionHandler = async (
     return provider;
   };
 
+  const getRollbackStore = async (): Promise<{ store: AuditStore; shouldClose: boolean }> => {
+    if (deps.auditStore) return { store: deps.auditStore, shouldClose: false };
+    const currentConfig = await getConfig();
+    return { store: createSqliteAuditStore(resolveOpsForgePaths(currentConfig)), shouldClose: true };
+  };
+
+  const rollbackRun = async (runId: string): Promise<ApplyResult> => {
+    if (deps.rollback) return deps.rollback(runId);
+    const currentConfig = await getConfig();
+    const { store, shouldClose } = await getRollbackStore();
+    try {
+      const detail = store.showRun(runId);
+      if (!detail?.plan) throw new Error(`Rollback plan not found for run: ${runId}`);
+      return executeRollbackPlan(
+        detail.plan,
+        runId,
+        {
+          dryRun: false,
+          yes: true,
+          json: false,
+          riskMax: parseRiskMax(currentConfig.riskMax),
+          allowShell: currentConfig.allowShell,
+          autoRollback: false,
+        },
+        {
+          ...deps,
+          facts: deps.facts,
+          config: currentConfig,
+          auditStore: store,
+        },
+      );
+    } finally {
+      if (shouldClose) store.close();
+    }
+  };
+
   const controller = createRuntimeActionController({
     interactive: true,
     buildPlan: async (prompt) => buildPlanFromPrompt({
@@ -82,6 +120,7 @@ export const createTuiRuntimeActionHandler = async (
         },
       );
     },
+    rollbackRun,
   });
 
   return async (action) => {

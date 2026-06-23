@@ -30,6 +30,7 @@ OpsForge is now being built plan-by-plan on `main`.
 - Plan 23 TUI runtime wiring: `docs/superpowers/plans/2026-06-23-opsforge-plan-23-tui-runtime-wiring.md`
 - Plan 24 safe file write and template execution: `docs/superpowers/plans/2026-06-23-opsforge-plan-24-safe-file-write-template.md`
 - Plan 25 skill templates: `docs/superpowers/plans/2026-06-23-opsforge-plan-25-skill-templates.md`
+- Plan 26 TUI audit rollback: `docs/superpowers/plans/2026-06-23-opsforge-plan-26-tui-audit-rollback.md`
 - Current implementation status and design alignment: `docs/implementation-status.md`
 - Checked-in Plan schema artifact: `schemas/plan.schema.json`
 

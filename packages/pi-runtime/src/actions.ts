@@ -30,6 +30,20 @@ const requiresApproval = (plan: Plan): boolean => {
   return classified.risk === "L2" || classified.risk === "L3";
 };
 
+const executionEvents = (result: ExecutePlanResult): RuntimeEvent[] => {
+  const events: RuntimeEvent[] = [{ type: "runtime.execution.finished", result }];
+  if (result.rollback.available && !result.rollback.autoExecuted) {
+    events.push({
+      type: "runtime.rollback.requested",
+      rollbackPrompt: {
+        runId: result.runId,
+        rollback: result.rollback,
+      },
+    });
+  }
+  return events;
+};
+
 export const createRuntimeActionController = (
   deps: RuntimeActionControllerDeps,
 ): RuntimeActionController => {
@@ -38,7 +52,7 @@ export const createRuntimeActionController = (
   const maybeExecute = async (plan: Plan, approval?: { reason?: string }): Promise<RuntimeEvent[]> => {
     if (!deps.executePlan) return [];
     const result = await deps.executePlan(plan, approval);
-    return [{ type: "runtime.execution.finished", result }];
+    return executionEvents(result);
   };
 
   const handleSubmit = async (prompt: string): Promise<RuntimeEvent[]> => {
@@ -86,7 +100,7 @@ export const createRuntimeActionController = (
     const result = await deps.rollbackRun(runId);
     return [
       { type: "runtime.thinking.delta", text: `Running guarded rollback for ${runId}.` },
-      { type: "runtime.execution.finished", result },
+      ...executionEvents(result),
     ];
   };
 
