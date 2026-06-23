@@ -9,6 +9,19 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@opsforge/audit": ["packages/audit/src/index.ts"],
+      "@opsforge/config": ["packages/config/src/index.ts"],
+      "@opsforge/core": ["packages/core/src/index.ts"],
+      "@opsforge/dsl": ["packages/dsl/src/index.ts"],
+      "@opsforge/executor-base": ["packages/executor-base/src/index.ts"],
+      "@opsforge/executor-linux": ["packages/executor-linux/src/index.ts"],
+      "@opsforge/executor-windows": ["packages/executor-windows/src/index.ts"],
+      "@opsforge/policy": ["packages/policy/src/index.ts"],
+      "@opsforge/shared": ["packages/shared/src/index.ts"],
+      "@opsforge/verifier": ["packages/verifier/src/index.ts"]
+    }
   }
 }
