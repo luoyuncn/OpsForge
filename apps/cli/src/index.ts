@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { buildApplyCommand, formatApplyResult, parseRiskMax } from "./commands/apply";
 import { buildDoctorReport, formatDoctorReport } from "./commands/doctor";
 import { systemWhich } from "./which";
 
@@ -16,6 +17,28 @@ program
       env: process.env,
     });
     console.log(formatDoctorReport(report));
+  });
+
+program
+  .command("apply")
+  .argument("<planJson>", "Path to a JSON plan file")
+  .description("执行一个已生成的 Plan JSON")
+  .option("--dry-run", "只编译和检查，不执行", false)
+  .option("-y, --yes", "批准 L2/L3 风险门禁", false)
+  .option("--json", "输出 JSON", false)
+  .option("--risk-max <level>", "允许的最高风险等级", "L3")
+  .option("--allow-shell", "允许 shell 逃生舱步骤", false)
+  .action(async (planJson: string, options: { dryRun: boolean; yes: boolean; json: boolean; riskMax: string; allowShell: boolean }) => {
+    const apply = buildApplyCommand();
+    const result = await apply(planJson, {
+      dryRun: options.dryRun,
+      yes: options.yes,
+      json: options.json,
+      riskMax: parseRiskMax(options.riskMax),
+      allowShell: options.allowShell,
+    });
+    console.log(options.json ? JSON.stringify(result, null, 2) : formatApplyResult(result));
+    if (!result.gate.allowed) process.exitCode = 1;
   });
 
 if (process.argv.slice(2).length === 0) {

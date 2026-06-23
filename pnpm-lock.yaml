@@ -23,12 +23,27 @@ importers:
 
   apps/cli:
     dependencies:
+      '@opsforge/audit':
+        specifier: workspace:*
+        version: link:../../packages/audit
       '@opsforge/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@opsforge/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@opsforge/dsl':
         specifier: workspace:*
         version: link:../../packages/dsl
+      '@opsforge/executor-base':
+        specifier: workspace:*
+        version: link:../../packages/executor-base
+      '@opsforge/executor-linux':
+        specifier: workspace:*
+        version: link:../../packages/executor-linux
+      '@opsforge/executor-windows':
+        specifier: workspace:*
+        version: link:../../packages/executor-windows
       commander:
         specifier: ^12.1.0
         version: 12.1.0

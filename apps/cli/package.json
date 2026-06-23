@@ -13,8 +13,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@opsforge/audit": "workspace:*",
     "@opsforge/config": "workspace:*",
+    "@opsforge/core": "workspace:*",
     "@opsforge/dsl": "workspace:*",
+    "@opsforge/executor-base": "workspace:*",
+    "@opsforge/executor-linux": "workspace:*",
+    "@opsforge/executor-windows": "workspace:*",
     "commander": "^12.1.0"
   },
   "devDependencies": {
