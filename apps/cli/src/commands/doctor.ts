@@ -5,6 +5,7 @@ export interface DoctorDeps {
   platform: NodeJS.Platform;
   which: WhichRunner;
   env: Record<string, string | undefined>;
+  fileContents?: string | null;
 }
 
 export interface DoctorReport {
@@ -18,7 +19,7 @@ export interface DoctorReport {
 
 export function buildDoctorReport(deps: DoctorDeps): DoctorReport {
   const os = detectOs(deps.platform);
-  const config = loadConfig({ env: deps.env, fileContents: null });
+  const config = loadConfig({ env: deps.env, fileContents: deps.fileContents ?? null });
   const p = config.provider;
   return {
     os,

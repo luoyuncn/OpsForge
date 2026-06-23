@@ -59,4 +59,33 @@ describe("buildPlanCommand", () => {
     expect(parsed.id).toBe("plan_cli_out");
     expect(parsed.steps[0]).toEqual({ type: "package-install", name: "nginx" });
   });
+
+  it("uses a configured provider resolver when requested", async () => {
+    const writes: string[] = [];
+    const requested: string[] = [];
+    const command = buildPlanCommand({
+      write: (text) => writes.push(text),
+      resolveProvider: async (options) => {
+        requested.push(options.provider);
+        return {
+          name: "configured-test",
+          buildPlan: async () => ({
+            title: "Install redis",
+            intent: "install",
+            steps: [{ type: "package-install", name: "redis" }],
+            risk: "L1",
+          }),
+        };
+      },
+      now: () => "2026-06-23T00:00:00Z",
+      planId: () => "plan_configured",
+    });
+
+    await command.parseAsync(["node", "test", "install redis", "--provider", "configured", "--json"], { from: "user" });
+
+    const parsed = JSON.parse(writes[0]);
+    expect(requested).toEqual(["configured"]);
+    expect(parsed.id).toBe("plan_configured");
+    expect(parsed.steps[0]).toEqual({ type: "package-install", name: "redis" });
+  });
 });

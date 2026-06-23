@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import type { Plan } from "@opsforge/dsl";
-import { buildPlanFromPrompt, createMockPlanProvider, type PlanProvider } from "@opsforge/planner";
+import { buildPlanFromPrompt, type PlanProvider } from "@opsforge/planner";
+import { resolvePlanProvider, type PlanProviderResolver } from "../provider";
 import {
   executeParsedPlan,
   formatApplyResult,
@@ -12,7 +13,10 @@ import {
 
 export interface BuildRunCommandDeps extends ExecutePlanDeps {
   provider?: PlanProvider;
+  resolveProvider?: PlanProviderResolver;
   write?: (text: string) => void;
+  env?: Record<string, string | undefined>;
+  configPath?: string;
   now?: () => string;
   planId?: () => string;
 }
@@ -42,10 +46,38 @@ export const buildRunCommand = (deps: BuildRunCommandDeps = {}): Command => {
     .option("--json", "输出 JSON", false)
     .option("--risk-max <level>", "允许的最高风险等级", "L3")
     .option("--allow-shell", "允许 shell 逃生舱步骤", false)
-    .action(async (prompt: string, options: { dryRun: boolean; yes: boolean; json: boolean; riskMax: string; allowShell: boolean }) => {
+    .option("--provider <mode>", "Provider mode: mock, configured, or openai-compatible", "mock")
+    .option("--model <id>", "Provider model id")
+    .option("--base-url <url>", "OpenAI-compatible base URL")
+    .option("--api-key-env <name>", "Environment variable that stores the API key")
+    .action(
+      async (
+        prompt: string,
+        options: {
+          dryRun: boolean;
+          yes: boolean;
+          json: boolean;
+          riskMax: string;
+          allowShell: boolean;
+          provider: string;
+          model?: string;
+          baseUrl?: string;
+          apiKeyEnv?: string;
+        },
+      ) => {
+      const provider =
+        deps.provider ??
+        (await (deps.resolveProvider ?? resolvePlanProvider)({
+          provider: options.provider,
+          model: options.model,
+          baseUrl: options.baseUrl,
+          apiKeyEnv: options.apiKeyEnv,
+          env: deps.env,
+          configPath: deps.configPath,
+        }));
       const plan = await buildPlanFromPrompt({
         prompt,
-        provider: deps.provider ?? createMockPlanProvider(),
+        provider,
         now: deps.now,
         planId: deps.planId,
       });

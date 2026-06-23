@@ -72,6 +72,39 @@ describe("buildRunCommand", () => {
     expect(parsed.result.dryRun).toBe(true);
     expect(parsed.result.commands[0].argv).toEqual(["apt-get", "install", "-y", "nginx"]);
   });
+
+  it("uses a configured provider resolver before executing the generated plan", async () => {
+    const writes: string[] = [];
+    const requested: string[] = [];
+    const command = buildRunCommand({
+      write: (text) => writes.push(text),
+      resolveProvider: async (options) => {
+        requested.push(options.provider);
+        return {
+          name: "configured-test",
+          buildPlan: async () => ({
+            title: "Install redis",
+            intent: "install",
+            steps: [{ type: "package-install", name: "redis" }],
+            risk: "L1",
+          }),
+        };
+      },
+      now: () => "2026-06-23T00:00:00Z",
+      planId: () => "plan_run_configured",
+      platform: "linux",
+      facts,
+      auditStore: createFakeAuditStore(),
+      runner: async () => ({ stdout: "", stderr: "", exitCode: 0 }),
+    });
+
+    await command.parseAsync(["node", "test", "install redis", "--provider", "configured", "--dry-run", "--json"], { from: "user" });
+
+    const parsed = JSON.parse(writes[0]);
+    expect(requested).toEqual(["configured"]);
+    expect(parsed.plan.steps[0]).toEqual({ type: "package-install", name: "redis" });
+    expect(parsed.result.commands[0].argv).toEqual(["apt-get", "install", "-y", "redis"]);
+  });
 });
 
 describe("formatRunResult", () => {

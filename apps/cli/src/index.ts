@@ -1,10 +1,22 @@
+import { readFileSync } from "node:fs";
 import { Command } from "commander";
+import { defaultConfigPath } from "@opsforge/config";
 import { buildAuditCommand } from "./commands/audit";
 import { buildApplyCommand, formatApplyResult, parseRiskMax } from "./commands/apply";
+import { buildConfigCommand } from "./commands/config";
 import { buildDoctorReport, formatDoctorReport } from "./commands/doctor";
 import { buildPlanCommand } from "./commands/plan";
 import { buildRunCommand } from "./commands/run";
 import { systemWhich } from "./which";
+
+const readOptionalConfigFile = (): string | null => {
+  try {
+    return readFileSync(defaultConfigPath(), "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
+  }
+};
 
 const program = new Command();
 
@@ -18,6 +30,7 @@ program
       platform: process.platform,
       which: systemWhich,
       env: process.env,
+      fileContents: readOptionalConfigFile(),
     });
     console.log(formatDoctorReport(report));
   });
@@ -45,6 +58,7 @@ program
   });
 
 program.addCommand(buildAuditCommand());
+program.addCommand(buildConfigCommand());
 program.addCommand(buildPlanCommand());
 program.addCommand(buildRunCommand());
 

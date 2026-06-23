@@ -2,12 +2,16 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { Command } from "commander";
 import type { Plan } from "@opsforge/dsl";
-import { buildPlanFromPrompt, createMockPlanProvider, type PlanProvider } from "@opsforge/planner";
+import { buildPlanFromPrompt, type PlanProvider } from "@opsforge/planner";
+import { resolvePlanProvider, type PlanProviderResolver } from "../provider";
 
 export interface BuildPlanCommandDeps {
   provider?: PlanProvider;
+  resolveProvider?: PlanProviderResolver;
   write?: (text: string) => void;
   writeFile?: (path: string, text: string) => Promise<void>;
+  env?: Record<string, string | undefined>;
+  configPath?: string;
   now?: () => string;
   planId?: () => string;
 }
@@ -46,10 +50,24 @@ export const buildPlanCommand = (deps: BuildPlanCommandDeps = {}): Command => {
     .argument("<prompt>", "Natural language operation goal")
     .option("--json", "输出 JSON", false)
     .option("--out <file>", "将 Plan JSON 写入文件")
-    .action(async (prompt: string, options: { json: boolean; out?: string }) => {
+    .option("--provider <mode>", "Provider mode: mock, configured, or openai-compatible", "mock")
+    .option("--model <id>", "Provider model id")
+    .option("--base-url <url>", "OpenAI-compatible base URL")
+    .option("--api-key-env <name>", "Environment variable that stores the API key")
+    .action(async (prompt: string, options: { json: boolean; out?: string; provider: string; model?: string; baseUrl?: string; apiKeyEnv?: string }) => {
+      const provider =
+        deps.provider ??
+        (await (deps.resolveProvider ?? resolvePlanProvider)({
+          provider: options.provider,
+          model: options.model,
+          baseUrl: options.baseUrl,
+          apiKeyEnv: options.apiKeyEnv,
+          env: deps.env,
+          configPath: deps.configPath,
+        }));
       const plan = await buildPlanFromPrompt({
         prompt,
-        provider: deps.provider ?? createMockPlanProvider(),
+        provider,
         now: deps.now,
         planId: deps.planId,
       });
